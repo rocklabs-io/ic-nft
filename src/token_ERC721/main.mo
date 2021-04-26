@@ -16,9 +16,8 @@ actor Token_ERC721{
     // Token symbol
     private stable var symbol_ : Text = "";
 
+    //the Uniform Resource Identifier (URI) for `tokenId` token.
     private stable var tokenURIs_ = HashMap.HashMap<Nat, Text>(1, Nat.equal, Hash.hash);
-
-
 
     // Mapping from token ID to owner address
     private var ownered = HashMap.HashMap<Nat, Principal>(1, Nat.equal, Hash.hash);
@@ -32,6 +31,7 @@ actor Token_ERC721{
     // Mapping from owner to operator approvals
     private var operatorApprovals = HashMap.HashMap<Principal, HashMap.HashMap<Principal, Bool>>(1, Principal.equal, Principal.hash);
 
+    //Mapping from owner to token list
     private var ownedTokens = HashMap.HashMap<Principal, [var Nat]>(1, Principal.equal, Principal.hash);
 
     
@@ -89,6 +89,23 @@ actor Token_ERC721{
         _addTokenTo(to, tokenId);
     };
 
+    private func _addTokenTo(to: Principal, tokenId: Nat) {
+        assert(_exists(tokenId) == false);
+        //_tok
+        switch(balances.get(to)) {
+            case (? to_balance) {
+                var to_balcance_new = to_balance + 1;
+                balances.put(to, to_balcance_new);
+                ownered.put(tokenId, to);
+                //TODO  ownedTokens need update.
+                return true;
+            };
+            case (_) {
+                return false;
+            };
+        }
+    };
+
     /**
     * @dev Internal function to burn a specific token
     * Reverts if the token does not exist
@@ -101,19 +118,29 @@ actor Token_ERC721{
 
     private func _clearApproval(owner: Principal, tokenId: Nat) {
         assert(_ownerOf(tokenId) == owner);
+        tokenApprovals.delete(tokenId);
 
     };
 
-    private func _addTokenTo(to: Principal, tokenId: Nat) {
-        assert(_exists(tokenId) == false);
-        _tok
+    private func _removeTokenFrom(owner: Principal, tokenId: Nat) {
+        assert(_ownerOf(tokenId) == owner);
+        switch(balances.get(owner)) {
+            case (? owner_balance) {
+                var owner_balcance_new = owner_balance - 1;
+                balances.put(owner, owner_balcance_new);
+                ownered.delete(tokenId);
+                // TODO ownedTokens need update.
+                return true;
+            };
+            case (_) {
+                return false;
+            };
+        }
     };
 
+    private func _checkAndCallSafeTransfer(from, to, tokenId, _data) : Bool {
 
-    private func _removeTokenFrom(to: Principal, tokenId: Nat) {
     };
-
-    private func _checkAndCallSafeTransfer(from, to, tokenId, _data) : Bool {};
 
     private func _setTokenURI(){
 
@@ -266,21 +293,21 @@ actor Token_ERC721{
      * Requirements:
      * - `tokenId` must exist.
      */
-    public shared(msg) func _burn(tokenId : Principal) : async Bool {
-        var owner: Principal = await ownerOf(tokenId);
-        tokenApprovals.put(tokenId, Principal.fromText(""));
-        switch(balances.get(owner)) {
-            case (? owner_balance) {
-                var owner_balcance_new = owner_balance - 1;
-                balances.put(owner, owner_balcance_new);
-                ownered.put(tokenId, Principal.fromText(""));
-                return true;
-            };
-            case (_) {
-                return false;
-            };
-        }
-    };
+    // public shared(msg) func _burn(tokenId : Principal) : async Bool {
+    //     var owner: Principal = await ownerOf(tokenId);
+    //     tokenApprovals.put(tokenId, Principal.fromText(""));
+    //     switch(balances.get(owner)) {
+    //         case (? owner_balance) {
+    //             var owner_balcance_new = owner_balance - 1;
+    //             balances.put(owner, owner_balcance_new);
+    //             ownered.put(tokenId, Principal.fromText(""));
+    //             return true;
+    //         };
+    //         case (_) {
+    //             return false;
+    //         };
+    //     }
+    // };
 
     /**
      * Mints `tokenId` and transfers it to `to`.
@@ -288,48 +315,32 @@ actor Token_ERC721{
      * - `tokenId` must not exist.
      * - `to` cannot be the zero address.
      */
-    public shared(msg) func _mint (to: Principal, tokenId: Principal) : async Bool {
-        assert( Utils._exists(ownered, tokenId) == false);
-        var owner: Principal = await ownerOf(tokenId);
-        switch(balances.get(to)) {
-            case (? to_balance) {
-                var to_balcance_new = to_balance + 1;
-                balances.put(owner, to_balcance_new);
-                ownered.put(tokenId, to);
-                return true;
-            };
-            case (_) {
-                return false;
-            };
-        }
-    };
-
-    /*
-     * Returns whether `tokenId` exists.
-     * Tokens can be managed by their owner or approved accounts via {approve} or {setApprovalForAll}.
-     * Tokens start existing when they are minted (`_mint`),
-     * and stop existing when they are burned (`_burn`).
-     */
-    private func _exists(tokenId: Principal) : async Bool {
-        switch (ownered.get(tokenId)) {
-            case (? owner) {
-                return true;
-            };
-            case (_) {
-                return false;
-            };
-        }
-    };
+    // public shared(msg) func _mint (to: Principal, tokenId: Principal) : async Bool {
+    //     assert( Utils._exists(ownered, tokenId) == false);
+    //     var owner: Principal = await ownerOf(tokenId);
+    //     switch(balances.get(to)) {
+    //         case (? to_balance) {
+    //             var to_balcance_new = to_balance + 1;
+    //             balances.put(owner, to_balcance_new);
+    //             ownered.put(tokenId, to);
+    //             return true;
+    //         };
+    //         case (_) {
+    //             return false;
+    //         };
+    //     }
+    // };
 
 
-    public shared(msg) func _isApprovedOrOwner(spender: Principal, tokenId: Principal) : async Bool {
-        assert(Utils._exists(ownered, tokenId) == false);
-        var owner: Principal = await  ownerOf(tokenId);
-        var approved : Principal = await getApproved(tokenId);
-        var isApprovedForAllBool : Bool = await isApprovedForAll(owner,spender);
-        var isApprovedOrOwner: Bool =  (spender == owner or spender == approved  or isApprovedForAllBool);
-        return isApprovedOrOwner;
-    };
+
+    // public shared(msg) func _isApprovedOrOwner(spender: Principal, tokenId: Principal) : async Bool {
+    //     assert(Utils._exists(ownered, tokenId) == false);
+    //     var owner: Principal = await  ownerOf(tokenId);
+    //     var approved : Principal = await getApproved(tokenId);
+    //     var isApprovedForAllBool : Bool = await isApprovedForAll(owner,spender);
+    //     var isApprovedOrOwner: Bool =  (spender == owner or spender == approved  or isApprovedForAllBool);
+    //     return isApprovedOrOwner;
+    // };
 
     /**
      * @dev Transfers `tokenId` from `from` to `to`.
