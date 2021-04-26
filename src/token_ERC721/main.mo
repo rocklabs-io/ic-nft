@@ -1,8 +1,9 @@
 import HashMap "mo:base/HashMap";
 import Principal "mo:base/Principal";
-import Utils "./utils"; 
 import Error "mo:base/Error";
 import Option "mo:base/Option";
+import Nat "mo:base/Nat";
+import Hash "mo:base/Hash";
 
 /**
  *  Implementation of https://github.com/icplabs/DIPs/blob/main/DIPS/dip-721.md Non-Fungible Token Standard.
@@ -15,17 +16,108 @@ actor Token_ERC721{
     // Token symbol
     private stable var symbol_ : Text = "";
 
+    private stable var tokenURIs_ = HashMap.HashMap<Nat, Text>(1, Nat.equal, Hash.hash);
+
+
+
     // Mapping from token ID to owner address
-    private var ownered = HashMap.HashMap<Principal, Principal>(1, Principal.equal, Principal.hash);
+    private var ownered = HashMap.HashMap<Nat, Principal>(1, Nat.equal, Hash.hash);
     
     // Mapping owner address to token count
-    private var balances = HashMap.HashMap<Principal,Nat>(1,Principal.equal,Principal.hash);
+    private var balances = HashMap.HashMap<Principal, Nat>(1,Principal.equal,Principal.hash);
 
     // Mapping from token ID to approved address
-    private var tokenApprovals = HashMap.HashMap<Principal, Principal>(1, Principal.equal, Principal.hash);
+    private var tokenApprovals = HashMap.HashMap<Nat, Principal>(1, Nat.equal, Hash.hash);
     
     // Mapping from owner to operator approvals
     private var operatorApprovals = HashMap.HashMap<Principal, HashMap.HashMap<Principal, Bool>>(1, Principal.equal, Principal.hash);
+
+    private var ownedTokens = HashMap.HashMap<Principal, [var Nat]>(1, Principal.equal, Principal.hash);
+
+    
+    /**
+    * @dev Returns whether the specified token exists
+    * @param tokenId Nat ID of the token to query the existence of
+    * @return whether the token exists
+    */
+    private func _exists(tokenId: Nat) : Bool {
+        switch (ownered.get(tokenId)) {
+            case (? owner) {
+                return true;
+            };
+            case (_) {
+                return false;
+            };
+        }
+    };
+
+    /*
+     * @notice Find the owner of an NFT
+     * NFTs assigned to the zero address are considered invalid, 
+     * and queries about them do throw.
+     * @param _tokenId The identifier for an NFT
+     * @return The address of the owner of the NFT
+     */
+    private func _ownerOf(tokenId: Nat) : Principal {
+        switch (ownered.get(tokenId)) {
+            case (? owner) {
+                return owner;
+            };
+            case _ {
+                throw Error.reject("token does not exist") 
+            };
+        }
+    };
+
+    /**
+     * Returns whether `spender` is allowed to manage `tokenId`.
+     * Requirements:
+     * - `tokenId` must exist.
+     */
+    private func _isApprovedOrOwner(spender: Principal, tokenId: Nat) : Bool {
+        let owner = _ownerOf(tokenId);
+        return (spender == owner or _getApproved(tokenId) == spender or _isApprovedForAll(owner, spender));
+    };
+
+    /**
+    * @dev private function to mint a new token
+    * Reverts if the given token ID already exists
+    * @param to The address that will own the minted token
+    * @param tokenId Nat ID of the token to be minted by the msg.sender
+    */
+    private func _mint(to: Principal, tokenId: Nat) {
+        _addTokenTo(to, tokenId);
+    };
+
+    /**
+    * @dev Internal function to burn a specific token
+    * Reverts if the token does not exist
+    * @param tokenId uint256 ID of the token being burned by the msg.sender
+    */
+    private func _burn(owner: Principal, tokenId: Nat) {
+        _clearApproval(owner, tokenId);
+        _removeTokenFrom(owner, tokenId);
+    };
+
+    private func _clearApproval(owner: Principal, tokenId: Nat) {
+        assert(_ownerOf(tokenId) == owner);
+
+    };
+
+    private func _addTokenTo(to: Principal, tokenId: Nat) {
+        assert(_exists(tokenId) == false);
+        _tok
+    };
+
+
+    private func _removeTokenFrom(to: Principal, tokenId: Nat) {
+    };
+
+    private func _checkAndCallSafeTransfer(from, to, tokenId, _data) : Bool {};
+
+    private func _setTokenURI(){
+
+    }
 
     /**
      * Token name
@@ -66,16 +158,8 @@ actor Token_ERC721{
      * @param _tokenId The identifier for an NFT
      * @return The address of the owner of the NFT
      */
-    public  query func ownerOf (tokenId: Principal) : async Principal {
-        assert(Utils._exists(ownered, tokenId));
-        switch (ownered.get(tokenId)) {
-            case (? owner) {
-                return owner;
-            };
-            case _ {
-                throw Error.reject("token has no owner") 
-            };
-        }
+    public query func ownerOf (tokenId: Nat) : async Principal {
+        return _ownerOf(tokenId);
     };
 
     /*
@@ -85,9 +169,9 @@ actor Token_ERC721{
      * @param _approved The new approved NFT controller
      * @param _tokenId The NFT to approve
      */
-    public shared(msg) func approve(spender: Principal, tokenId: Principal ) : async Bool {
+    public shared(msg) func approve(spender: Principal, tokenId: Nat ) : async Bool {
         var owner: Principal = await ownerOf(tokenId);
-        assert(Principal.equal(msg.caller, owner));
+        assert(Principal.equal(msg.caller, owner) or isApprovedForAll(owner, msg.call));
         assert(msg.caller != spender);
         assert(Utils._exists(ownered, tokenId));
         tokenApprovals.put(tokenId, spender);
@@ -100,14 +184,14 @@ actor Token_ERC721{
      * @param _tokenId The NFT to find the approved address for
      * @return The approved address for this NFT, or the zero address if there is none
      */
-    public query func getApproved (tokenId: Principal) : async Principal {
+    public query func getApproved(tokenId: Nat) : async Principal {
         assert(Utils._exists(ownered, tokenId));
         switch (tokenApprovals.get(tokenId)) {
             case (?approved) {
                 return approved;
             };
             case _ {
-                throw Error.reject("token has no approved") 
+                throw Error.reject("token has no approved Principal") 
             };
         }
     };
@@ -170,7 +254,7 @@ actor Token_ERC721{
      * @param _to The new owner.
      * @param _tokenId The NFT to transfer
      */
-    public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Principal) : async Bool {
+    public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
         assert(await _isApprovedOrOwner(msg.caller, tokenId));
         return await _transfer(from, to , tokenId);
     };
@@ -237,11 +321,7 @@ actor Token_ERC721{
         }
     };
 
-    /**
-     * Returns whether `spender` is allowed to manage `tokenId`.
-     * Requirements:
-     * - `tokenId` must exist.
-     */
+
     public shared(msg) func _isApprovedOrOwner(spender: Principal, tokenId: Principal) : async Bool {
         assert(Utils._exists(ownered, tokenId) == false);
         var owner: Principal = await  ownerOf(tokenId);
@@ -279,9 +359,5 @@ actor Token_ERC721{
     //TODO 
     public query func tokenURI(tokenId: Principal) : async Text {
         return "";
-    };
-
-    public shared(msg) func callerPrincipal() : async Principal {
-        return msg.caller;
     };
 };

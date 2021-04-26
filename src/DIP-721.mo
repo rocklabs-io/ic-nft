@@ -10,7 +10,7 @@ public query func balanceOf(_owner: Principal) : async Nat {}
 ///  about them do throw.
 /// @param _tokenId The identifier for an NFT
 /// @return The address of the owner of the NFT
-public  query func ownerOf (_tokenId: Principal) : async Principal {}
+public  query func ownerOf (_tokenId: Nat) : async Principal {}
 
 /// @notice Transfers the ownership of an NFT from one address to another address
 /// @dev Throws unless `msg.caller` is the current owner, an authorized
@@ -24,7 +24,8 @@ public  query func ownerOf (_tokenId: Principal) : async Principal {}
 /// @param _to The new owner
 /// @param _tokenId The NFT to transfer
 /// @param data Additional data with no specified format, sent in call to `_to`
-public shared(msg) func safeTransferFrom(_from: Principal, _to: Principal, _tokenId: Principal, data: Text) : async Bool {}
+// 这个接口需要改名或者删除，因为在 motoko 里面会判断重命名
+public shared(msg) func safeTransferFrom(_from: Principal, _to: Principal, _tokenId: Nat, data: Text) : async Bool {}
 
 /// @notice Transfers the ownership of an NFT from one address to another address
 /// @dev This works identically to the other function with an extra data parameter,
@@ -32,7 +33,7 @@ public shared(msg) func safeTransferFrom(_from: Principal, _to: Principal, _toke
 /// @param _from The current owner of the NFT
 /// @param _to The new owner
 /// @param _tokenId The NFT to transfer
-public shared(msg) func safeTransferFrom(_from: Principal, _to: Principal, _tokenId: Principal) : async Bool {}
+public shared(msg) func safeTransferFrom(_from: Principal, _to: Principal, _tokenId: Nat) : async Bool {}
 
 /// @notice Transfer ownership of an NFT -- THE CALLER IS RESPONSIBLE
 ///  TO CONFIRM THAT `_to` IS CAPABLE OF RECEIVING NFTS OR ELSE
@@ -44,7 +45,7 @@ public shared(msg) func safeTransferFrom(_from: Principal, _to: Principal, _toke
 /// @param _from The current owner of the NFT
 /// @param _to The new owner
 /// @param _tokenId The NFT to transfer
-public shared(msg) func transferFrom(_from: Principal, _to: Principal, _tokenId: Principal) : async Bool {}
+public shared(msg) func transferFrom(_from: Principal, _to: Principal, _tokenId: Nat) : async Bool {}
 
 /// @notice Change or reaffirm the approved address for an NFT
 /// @dev The zero address indicates there is no approved address.
@@ -52,7 +53,7 @@ public shared(msg) func transferFrom(_from: Principal, _to: Principal, _tokenId:
 ///  operator of the current owner.
 /// @param _approved The new approved NFT controller
 /// @param _tokenId The NFT to approve
-public shared(msg) func approve(_approved: Principal, _tokenId: Principal ) : async Bool {}
+public shared(msg) func approve(_approved: Principal, _tokenId: Nat ) : async Bool {}
 
 /// @notice Enable or disable approval for a third party ("operator") to manage
 ///  all of `msg.caller`'s assets
@@ -87,7 +88,7 @@ public query func isApprovedForAll(_owner: Principal, _operator: Principal) : as
 /// @param _data Additional data with no specified format
 /// @return `bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"))`
 ///  unless throwing
-public query func onERC721Received(_operator: Principal, _from: Principal, _tokenId: Principal, data: Text) : async char {}
+public query func onERC721Received(_operator: Principal, _from: Principal, _tokenId: Nat, data: Text) : async Char {}
 
 
 /// @notice A descriptive name for a collection of NFTs in this contract
@@ -100,20 +101,20 @@ public query func symbol() : async Text {}
 /// @dev Throws if `_tokenId` is not a valid NFT. URIs are defined in RFC
 ///  3986. The URI may point to a JSON file that conforms to the "ERC721
 ///  Metadata JSON Schema".
-public query func tokenURI(_tokenId: Principal) : async Text {}
+public query func tokenURI(_tokenId: Nat) : async Text {}
 
 
 /// @notice Count NFTs tracked by this contract
 /// @return A count of valid NFTs tracked by this contract, where each one of
 ///  them has an assigned and queryable owner not equal to the zero address
-public query func totalSupply() : async Nat{}
+public query func totalSupply() : async Nat {}
 
 /// @notice Enumerate valid NFTs
 /// @dev Throws if `_index` >= `totalSupply()`.
 /// @param _index A counter less than `totalSupply()`
 /// @return The token identifier for the `_index`th NFT,
 ///  (sort order not specified)
-public query func tokenByIndex(_index: Nat) : async Principal {}
+public query func tokenByIndex(_index: Nat) : async Nat {}
 
 /// @notice Enumerate NFTs assigned to an owner
 /// @dev Throws if `_index` >= `balanceOf(_owner)` or if
@@ -122,5 +123,5 @@ public query func tokenByIndex(_index: Nat) : async Principal {}
 /// @param _index A counter less than `balanceOf(_owner)`
 /// @return The token identifier for the `_index`th NFT assigned to `_owner`,
 ///   (sort order not specified)
-public query func tokenOfOwnerByIndex(_owner: Principal, _index: Nat) : async Principal {}
+public query func tokenOfOwnerByIndex(_owner: Principal, _index: Nat) : async Nat {}
 
