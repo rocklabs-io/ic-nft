@@ -4,6 +4,7 @@ import Error "mo:base/Error";
 import Option "mo:base/Option";
 import Nat "mo:base/Nat";
 import Hash "mo:base/Hash";
+import Text "mo:base/Text";
 
 /**
  *  Implementation of https://github.com/icplabs/DIPs/blob/main/DIPS/dip-721.md Non-Fungible Token Standard.
@@ -17,7 +18,7 @@ actor Token_ERC721{
     private stable var symbol_ : Text = "";
 
     //the Uniform Resource Identifier (URI) for `tokenId` token.
-    private stable var tokenURIs_ = HashMap.HashMap<Nat, Text>(1, Nat.equal, Hash.hash);
+    private var tokenURIs_ = HashMap.HashMap<Nat, Text>(1, Nat.equal, Hash.hash);
 
     // Mapping from token ID to owner address
     private var ownered = HashMap.HashMap<Nat, Principal>(1, Nat.equal, Hash.hash);
@@ -64,7 +65,25 @@ actor Token_ERC721{
                 return owner;
             };
             case _ {
-                throw Error.reject("token does not exist") 
+                throw Error.reject("token does not exist")
+            };
+        }
+    };
+
+    /*
+     * @notice Count all NFTs assigned to an owner
+     * NFTs assigned to the zero address are considered invalid, 
+     * and this function throws for queries about the zero address.
+     * @param _owner An address for whom to query the balance
+     * @return The number of NFTs owned by `_owner`, possibly zero
+     */
+    private func _balanceOf(who: Principal) : Nat {
+        switch (balances.get(who)) {
+            case (? balance) {
+                return balance;
+            };
+            case _ {
+                throw Error.reject("Failed to query balance")
             };
         }
     };
@@ -76,7 +95,7 @@ actor Token_ERC721{
      */
     private func _isApprovedOrOwner(spender: Principal, tokenId: Nat) : Bool {
         let owner = _ownerOf(tokenId);
-        return (spender == owner or _getApproved(tokenId) == spender or _isApprovedForAll(owner, spender));
+        return (spender == owner or (_getApproved(tokenId) == spender) or _isApprovedForAll(owner, spender));
     };
 
     /**
@@ -85,11 +104,11 @@ actor Token_ERC721{
     * @param to The address that will own the minted token
     * @param tokenId Nat ID of the token to be minted by the msg.sender
     */
-    private func _mint(to: Principal, tokenId: Nat) {
-        _addTokenTo(to, tokenId);
+    private func _mint(to: Principal, tokenId: Nat): Bool {
+       return _addTokenTo(to, tokenId);
     };
 
-    private func _addTokenTo(to: Principal, tokenId: Nat) {
+    private func _addTokenTo(to: Principal, tokenId: Nat) : Bool {
         assert(_exists(tokenId) == false);
         //_tok
         switch(balances.get(to)) {
@@ -111,9 +130,9 @@ actor Token_ERC721{
     * Reverts if the token does not exist
     * @param tokenId uint256 ID of the token being burned by the msg.sender
     */
-    private func _burn(owner: Principal, tokenId: Nat) {
+    private func _burn(owner: Principal, tokenId: Nat) : Bool{
         _clearApproval(owner, tokenId);
-        _removeTokenFrom(owner, tokenId);
+        return _removeTokenFrom(owner, tokenId);
     };
 
     private func _clearApproval(owner: Principal, tokenId: Nat) {
@@ -122,7 +141,7 @@ actor Token_ERC721{
 
     };
 
-    private func _removeTokenFrom(owner: Principal, tokenId: Nat) {
+    private func _removeTokenFrom(owner: Principal, tokenId: Nat): Bool {
         assert(_ownerOf(tokenId) == owner);
         switch(balances.get(owner)) {
             case (? owner_balance) {
@@ -138,13 +157,13 @@ actor Token_ERC721{
         }
     };
 
-    private func _checkAndCallSafeTransfer(from, to, tokenId, _data) : Bool {
+    // private func _checkAndCallSafeTransfer(from, to, tokenId, _data) : Bool {
 
-    };
+    // };
 
     private func _setTokenURI(){
 
-    }
+    };
 
     /**
      * Token name
@@ -161,35 +180,6 @@ actor Token_ERC721{
     };
 
     /*
-     * @notice Count all NFTs assigned to an owner
-     * NFTs assigned to the zero address are considered invalid, 
-     * and this function throws for queries about the zero address.
-     * @param _owner An address for whom to query the balance
-     * @return The number of NFTs owned by `_owner`, possibly zero
-     */
-    public query func balanceOf(who: Principal) : async Nat {
-        switch (balances.get(who)) {
-            case (?balance) {
-                return balance;
-            };
-            case (_) {
-                return 0 ;
-            };
-        }
-    };
-
-    /*
-     * @notice Find the owner of an NFT
-     * NFTs assigned to the zero address are considered invalid, 
-     * and queries about them do throw.
-     * @param _tokenId The identifier for an NFT
-     * @return The address of the owner of the NFT
-     */
-    public query func ownerOf (tokenId: Nat) : async Principal {
-        return _ownerOf(tokenId);
-    };
-
-    /*
      * @notice Change or reaffirm the approved address for an NFT
      * The zero address indicates there is no approved address.
      * Throws unless `msg.caller` is the current NFT owner, or an authorized operator of the current owner.
@@ -197,12 +187,16 @@ actor Token_ERC721{
      * @param _tokenId The NFT to approve
      */
     public shared(msg) func approve(spender: Principal, tokenId: Nat ) : async Bool {
-        var owner: Principal = await ownerOf(tokenId);
-        assert(Principal.equal(msg.caller, owner) or isApprovedForAll(owner, msg.call));
-        assert(msg.caller != spender);
-        assert(Utils._exists(ownered, tokenId));
-        tokenApprovals.put(tokenId, spender);
+        var owner: Principal = _ownerOf(tokenId);
+        assert(Principal.equal(msg.caller, owner) or _isApprovedForAll(owner, msg.caller));
+        assert(owner != spender);
+        _approve(spender, tokenId);
         return true;
+    };
+
+    private func _approve(spender: Principal, tokenId: Nat) {
+        assert(_exists(tokenId));
+        tokenApprovals.put(tokenId, spender);
     };
 
     /*
@@ -211,8 +205,8 @@ actor Token_ERC721{
      * @param _tokenId The NFT to find the approved address for
      * @return The approved address for this NFT, or the zero address if there is none
      */
-    public query func getApproved(tokenId: Nat) : async Principal {
-        assert(Utils._exists(ownered, tokenId));
+    private func _getApproved(tokenId: Nat) : Principal {
+        assert(_exists(tokenId));
         switch (tokenApprovals.get(tokenId)) {
             case (?approved) {
                 return approved;
@@ -253,7 +247,7 @@ actor Token_ERC721{
      * @param _operator The address that acts on behalf of the owner
      * @return True if `_operator` is an approved operator for `_owner`, false otherwise
      */
-    public query func isApprovedForAll(owner: Principal, operator: Principal) : async Bool {
+    private func _isApprovedForAll(owner: Principal, operator: Principal) : Bool {
         switch(operatorApprovals.get(owner)){
             case (?ownerApprove) {
                 switch (ownerApprove.get(operator)) {
@@ -282,65 +276,9 @@ actor Token_ERC721{
      * @param _tokenId The NFT to transfer
      */
     public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
-        assert(await _isApprovedOrOwner(msg.caller, tokenId));
-        return await _transfer(from, to , tokenId);
+        assert (_isApprovedOrOwner(msg.caller, tokenId));
+        return  _transfer(from, to , tokenId);
     };
-
-
-    /**
-     * Destroys `tokenId`.
-     * The approval is cleared when the token is burned.
-     * Requirements:
-     * - `tokenId` must exist.
-     */
-    // public shared(msg) func _burn(tokenId : Principal) : async Bool {
-    //     var owner: Principal = await ownerOf(tokenId);
-    //     tokenApprovals.put(tokenId, Principal.fromText(""));
-    //     switch(balances.get(owner)) {
-    //         case (? owner_balance) {
-    //             var owner_balcance_new = owner_balance - 1;
-    //             balances.put(owner, owner_balcance_new);
-    //             ownered.put(tokenId, Principal.fromText(""));
-    //             return true;
-    //         };
-    //         case (_) {
-    //             return false;
-    //         };
-    //     }
-    // };
-
-    /**
-     * Mints `tokenId` and transfers it to `to`.
-     * Requirements:
-     * - `tokenId` must not exist.
-     * - `to` cannot be the zero address.
-     */
-    // public shared(msg) func _mint (to: Principal, tokenId: Principal) : async Bool {
-    //     assert( Utils._exists(ownered, tokenId) == false);
-    //     var owner: Principal = await ownerOf(tokenId);
-    //     switch(balances.get(to)) {
-    //         case (? to_balance) {
-    //             var to_balcance_new = to_balance + 1;
-    //             balances.put(owner, to_balcance_new);
-    //             ownered.put(tokenId, to);
-    //             return true;
-    //         };
-    //         case (_) {
-    //             return false;
-    //         };
-    //     }
-    // };
-
-
-
-    // public shared(msg) func _isApprovedOrOwner(spender: Principal, tokenId: Principal) : async Bool {
-    //     assert(Utils._exists(ownered, tokenId) == false);
-    //     var owner: Principal = await  ownerOf(tokenId);
-    //     var approved : Principal = await getApproved(tokenId);
-    //     var isApprovedForAllBool : Bool = await isApprovedForAll(owner,spender);
-    //     var isApprovedOrOwner: Bool =  (spender == owner or spender == approved  or isApprovedForAllBool);
-    //     return isApprovedOrOwner;
-    // };
 
     /**
      * @dev Transfers `tokenId` from `from` to `to`.
@@ -350,10 +288,10 @@ actor Token_ERC721{
      * - `to` cannot be the zero address.
      * - `tokenId` token must be owned by `from`.
      */
-    public shared(msg) func _transfer(from: Principal, to: Principal, tokenId: Principal) : async Bool {
-        var owner: Principal = await  ownerOf(tokenId);
+    private func _transfer(from: Principal, to: Principal, tokenId: Nat) :  Bool {
+        var owner: Principal =  _ownerOf(tokenId);
         assert(owner == from);
-        tokenApprovals.put(tokenId, Principal.fromText(""));
+        _clearApproval(from, tokenId);
         switch(balances.get(from), balances.get(to)) {
             case(?from_balance, ?to_balance) {
                 var from_balance_new =  from_balance - 1;
@@ -367,8 +305,32 @@ actor Token_ERC721{
         }
     };
 
+    public shared(msg) func safeTransferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
+        return await safeTransferFromWithData(from, to, tokenId, "ICP");
+    };
+
+    public shared(msg) func safeTransferFromWithData(from: Principal, to: Principal, tokenId: Nat, data: Text) : async Bool {
+        assert (_isApprovedOrOwner(msg.caller, tokenId));
+        return  _safeTransfer(from, to , tokenId, data);
+
+
+    };
+
+    private func _safeTransfer(from: Principal, to: Principal, tokenId: Nat, data: Text) :  Bool {
+        var bool : Bool  = _transfer(from, to , tokenId);
+        return _checkOnERC721Received(from, to, tokenId, data);
+    };
+
+    //TODO  what should I check ?
+    private func _checkOnERC721Received(from: Principal, to: Principal, tokenId: Nat, data: Text) : Bool {
+      //TODO
+      return true;  
+    };
+
+
     //TODO 
-    public query func tokenURI(tokenId: Principal) : async Text {
+    private func tokenURI(tokenId: Principal) :  Text {
         return "";
     };
+
 };
