@@ -71,6 +71,8 @@ function _safeTransfer(address from, address to, uint256 tokenId, bytes memory _
 
 3. tokenURI  
 
+4. 一起检查 方法的 public 和 private 的界定
+
 
 
 
