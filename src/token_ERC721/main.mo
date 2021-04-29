@@ -354,16 +354,24 @@ actor Token_ERC721{
         return _checkOnERC721Received(from, to, tokenId, data);
     };
 
+    /**
+     * @dev See {IERC721Metadata-tokenURI}.
+     */
+    public query func tokenURI(tokenId: Nat) : async Text {
+        switch(tokenURIs_.get(tokenId)){
+            case(?uri){
+                uri;
+            };
+            case(_){
+                "ERC721Metadata: URI query for nonexistent token";
+            };
+        };
+    };
+
     //TODO  what should I check ?
     private func _checkOnERC721Received(from: Principal, to: Principal, tokenId: Nat, data: Text) : Bool {
       //TODO
       return true;  
-    };
-
-
-    //TODO 
-    private func tokenURI(tokenId: Principal) :  Text {
-        return "";
     };
 
 };
