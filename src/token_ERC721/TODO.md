@@ -58,7 +58,10 @@ function safeTransferFromWithData(address from, address to, uint256 tokenId, byt
 
 function _safeTransfer(address from, address to, uint256 tokenId, bytes memory _data) internal virtual
 
-
+### 2021.04.29 本次提交完善
+  完善tokenURI方法 实现solidity-ERC721功能 
+  略微改动 未用assert 原因为其无法返回查询不到的Text，改为switch-case结构
+  
 ### 2. 待讨论问题
 
 1. throw Error 报错
@@ -69,7 +72,7 @@ function _safeTransfer(address from, address to, uint256 tokenId, bytes memory _
 
 需要校验哪些条件
 
-3. tokenURI  
+3. tokenURI 的 set get方法  
 
 4. 一起检查 方法的 public 和 private 的界定
 
