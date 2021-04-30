@@ -79,5 +79,15 @@ function _safeTransfer(address from, address to, uint256 tokenId, bytes memory _
 
 
 
+### 2021. 04. 30  本次提交完善 
+1. 对 _mint 方法中 ownedTokens List 的处理进行完善。
+
+先把tokenId 转换为List， 然后使用append方法。
+
+2. 对 _burn 方法中 ownedTokens List 的处理进行完善。
+ 
+使用filter 方法。
+
+3. 对 _transfer 方法中 ownedTokens List 的处理进行完善。
 
 
