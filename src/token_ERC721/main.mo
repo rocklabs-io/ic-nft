@@ -63,7 +63,7 @@ actor Token_ERC721{
      * @param _tokenId The identifier for an NFT
      * @return The address of the owner of the NFT
      */
-     func ownerOf(tokenId: Nat) : async Principal {
+     public func ownerOf(tokenId: Nat) : async Principal {
         switch (_ownerOf(tokenId)) {
             case (? owner) {
                 return owner;
@@ -368,10 +368,30 @@ actor Token_ERC721{
         };
     };
 
-    //TODO  what should I check ?
-    private func _checkOnERC721Received(from: Principal, to: Principal, tokenId: Nat, data: Text) : Bool {
-      //TODO
-      return true;  
+        /**
+     * @dev Internal function to invoke {IERC721Receiver-onERC721Received} on a target address.
+     * The call is not executed if the target address is not a contract.
+     *
+     * @param from address representing the previous owner of the given token ID
+     * @param to target address that will receive the tokens
+     * @param tokenId uint256 ID of the token to be transferred
+     * @param _data bytes optional data to send along with the call                 <<< solidity - func call use
+     * @return bool whether the call correctly returned the expected magic value
+     */
+    private func _checkOnERC721Received(from: Principal, to: Principal, tokenId: Nat) : Bool {
+        assert(_exists(tokenId));
+        switch(_ownerOf(tokenId)){
+            case(?owner){
+                if(owner == to){
+                    true;
+                }else{
+                    false;
+                }
+            };
+            case(_){
+                //throw Error.reject("token does not exist, can't get owner");
+                false;
+            };
+        };
     };
-
 };
