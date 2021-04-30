@@ -5,6 +5,7 @@ import Option "mo:base/Option";
 import Nat "mo:base/Nat";
 import Hash "mo:base/Hash";
 import Text "mo:base/Text";
+import List "mo:base/List";
 
 /**
  *  Implementation of https://github.com/icplabs/DIPs/blob/main/DIPS/dip-721.md Non-Fungible Token Standard.
@@ -33,8 +34,8 @@ actor Token_ERC721{
     private var operatorApprovals = HashMap.HashMap<Principal, HashMap.HashMap<Principal, Bool>>(1, Principal.equal, Principal.hash);
 
     //Mapping from owner to token list
-    private var ownedTokens = HashMap.HashMap<Principal, [var Nat]>(1, Principal.equal, Principal.hash);
-
+    //private var ownedTokens = HashMap.HashMap<Principal, [var Nat]>(1, Principal.equal, Principal.hash);
+    private var ownedTokens = HashMap.HashMap<Principal, List.List<Nat>>(1, Principal.equal, Principal.hash);
     
     /**
     * @dev Returns whether the specified token exists
@@ -124,13 +125,18 @@ actor Token_ERC721{
     private func _addTokenTo(to: Principal, tokenId: Nat) : Bool {
         assert(_exists(tokenId) == false);
         //_tok
-        switch(balances.get(to)) {
-            case (? to_balance) {
+        switch(balances.get(to),ownedTokens.get(to)) {
+            case (? to_balance, ?tokenList) {
                 var to_balcance_new = to_balance + 1;
                 balances.put(to, to_balcance_new);
-                ownered.put(tokenId, to);
                 //TODO  ownedTokens need update.
-                return true;
+                ownedTokens.put(to, tokenList);
+                ownered.put(tokenId, to);
+                var element = List.make<Nat>(tokenId);
+                var another = List.append<Nat>(element, tokenList);
+                ownedTokens.put(to, another);
+                true; 
+                //return true;
             };
             case (_) {
                 return false;
@@ -151,7 +157,6 @@ actor Token_ERC721{
     private func _clearApproval(owner: Principal, tokenId: Nat) {
         assert(_ownerOf(tokenId) != null and Option.unwrap<Principal>(_ownerOf(tokenId)) == owner);
         tokenApprovals.delete(tokenId);
-
     };
 
     private func _removeTokenFrom(owner: Principal, tokenId: Nat): Bool {
@@ -174,9 +179,14 @@ actor Token_ERC721{
 
     // };
 
-    private func _setTokenURI(){
+    //set Token URI
+    /**
+    private func _setTokenURI(tokenId : Nat){
 
+        assert(!_exists(tokenId));
+        tokenURIs_.put(tokenId, )
     };
+    */
 
     /**
      * Token name
@@ -351,7 +361,7 @@ actor Token_ERC721{
 
     private func _safeTransfer(from: Principal, to: Principal, tokenId: Nat, data: Text) :  Bool {
         var bool : Bool  = _transfer(from, to , tokenId);
-        return _checkOnERC721Received(from, to, tokenId, data);
+        return _checkOnERC721Received(from, to, tokenId);
     };
 
     /**
@@ -368,7 +378,8 @@ actor Token_ERC721{
         };
     };
 
-        /**
+
+    /**
      * @dev Internal function to invoke {IERC721Receiver-onERC721Received} on a target address.
      * The call is not executed if the target address is not a contract.
      *
