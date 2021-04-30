@@ -125,18 +125,19 @@ actor Token_ERC721{
     private func _addTokenTo(to: Principal, tokenId: Nat) : Bool {
         assert(_exists(tokenId) == false);
         //_tok
-        switch(balances.get(to),ownedTokens.get(to)) {
+        switch(balances.get(to), ownedTokens.get(to)) {
             case (? to_balance, ?tokenList) {
+                // 1. update balances
                 var to_balcance_new = to_balance + 1;
                 balances.put(to, to_balcance_new);
-                //TODO  ownedTokens need update.
-                ownedTokens.put(to, tokenList);
+                // 2. update ownered 
                 ownered.put(tokenId, to);
-                var element = List.make<Nat>(tokenId);
-                var another = List.append<Nat>(element, tokenList);
-                ownedTokens.put(to, another);
-                true; 
-                //return true;
+                // 3. update ownedTokens of to
+                var tokenIdOfList = List.make<Nat>(tokenId);
+                var tokenList_new = List.append<Nat>(tokenIdOfList, tokenList);
+                ownedTokens.put(to, tokenList_new);
+                
+                return true; 
             };
             case (_) {
                 return false;
@@ -161,12 +162,18 @@ actor Token_ERC721{
 
     private func _removeTokenFrom(owner: Principal, tokenId: Nat): Bool {
         assert(_ownerOf(tokenId) != null and Option.unwrap<Principal>(_ownerOf(tokenId)) == owner);
-        switch(balances.get(owner)) {
-            case (? owner_balance) {
+        switch(balances.get(owner), ownedTokens.get(owner)) {
+            case (? owner_balance, ?tokenList ) {
+                // 1. update balances
                 var owner_balcance_new = owner_balance - 1;
                 balances.put(owner, owner_balcance_new);
+                // 2. update ownered
                 ownered.delete(tokenId);
-                // TODO ownedTokens need update.
+                // 3. update ownedTokens of owner
+                let isBurnToken = func (x : Nat) : Bool {Nat.notEqual(x, tokenId)};
+                var tokenList_new  = List.filter<Nat>(tokenList, isBurnToken);
+                ownedTokens.put(owner, tokenList_new);
+                
                 return true;
             };
             case (_) {
@@ -335,11 +342,24 @@ actor Token_ERC721{
         };
         assert(owner == from);
         _clearApproval(from, tokenId);
-        switch(balances.get(from), balances.get(to)) {
-            case(?from_balance, ?to_balance) {
+        switch(balances.get(from), balances.get(to), ownedTokens.get(from), ownedTokens.get(to)) {
+            case(?from_balance, ?to_balance, ?tokenListFrom, ?tokenListTo) {
+                //1. update balances
                 var from_balance_new =  from_balance - 1;
                 var to_balance_new = to_balance + 1;
+                balances.put(from, from_balance_new);
+                balances.put(to, to_balance_new);
+                //2. update ownered
                 ownered.put(tokenId, to);
+                //3. update ownedTokens of from
+                let isBurnToken = func (x : Nat) : Bool {Nat.notEqual(x, tokenId)};
+                var tokenListFrom_new  = List.filter<Nat>(tokenListFrom, isBurnToken);
+                ownedTokens.put(from, tokenListFrom_new);
+                //4. update ownedTokens of to
+                var tokenIdOfList = List.make<Nat>(tokenId);
+                var tokenListTo_new = List.append<Nat>(tokenIdOfList, tokenListTo);
+                ownedTokens.put(to, tokenListTo_new);
+
                 return true;
             };
             case (_) {
