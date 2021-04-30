@@ -1,36 +1,4 @@
 
-### 1. 已有方法
-
-name
-
-symbol
-
-balanceOf
-
-ownerOf
-
-_exists
-
-transferFrom
-
-_transfer
-
-approve
-
-getApproved
-
-
-setApprovalForAll
-
-isApprovedForAll
-
-_isApprovedOrOwner
-
-_mint
-
-_burn
-
-tokenURI
 
 ### 2021.04.26 本次提交完善方法
 
@@ -61,21 +29,8 @@ function _safeTransfer(address from, address to, uint256 tokenId, bytes memory _
 
 ### 2021.04.29 本次提交完善
   完善tokenURI方法 实现solidity-ERC721功能 
+
   略微改动 未用assert 原因为其无法返回查询不到的Text，改为switch-case结构
-  
-### 2. 待讨论问题
-
-1. throw Error 报错
-
-/Users/suzy/2021project/dfinity/nft-team/nft-token/src/token_ERC721/main.mo:68.17-68.59: type error [M0039], misplaced throw
-
-2. _checkOnERC721Received
-
-需要校验哪些条件
-
-3. tokenURI 的 set get方法  
-
-4. 一起检查 方法的 public 和 private 的界定
 
 
 
