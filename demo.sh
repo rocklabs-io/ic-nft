@@ -181,6 +181,10 @@ eval dfx canister call token_ERC721 tokenOfOwnerByIndex "'($BOB_PUBLIC_KEY, 0)'"
 eval dfx canister call token_ERC721 tokenOfOwnerByIndex "'($BOB_PUBLIC_KEY, 1)'"
 eval dfx canister call token_ERC721 tokenOfOwnerByIndex "'($BOB_PUBLIC_KEY, 2)'"
 eval dfx canister call token_ERC721 tokenOfOwnerByIndex "'($BOB_PUBLIC_KEY, 3)'"
+eval dfx canister call token_ERC721 tokenOfOwnerByIndex "'($DAN_PUBLIC_KEY, 0)'"
+eval dfx canister call token_ERC721 tokenOfOwnerByIndex "'($DAN_PUBLIC_KEY, 1)'"
+eval dfx canister call token_ERC721 tokenOfOwnerByIndex "'($BOB_PUBLIC_KEY, 2)'"
+
 
 echo == get token by index 
 eval dfx canister call token_ERC721 tokenByIndex "'(0)'"
@@ -199,8 +203,8 @@ eval dfx canister call token_ERC721 balanceOf "'($DAN_PUBLIC_KEY)'"
 echo == owner of token 3
 eval dfx canister call token_ERC721 ownerOf "'(3)'"
 
-echo == bob transfer nft 3 to canister 
-eval HOME=$BOB_HOME dfx canister call token_ERC721 transferFrom "'($BOB_PUBLIC_KEY, $NFT_ID, 3)'"
+echo == Dan transfer nft 3 to canister 
+eval HOME=$DAN_HOME dfx canister call token_ERC721 transferFrom "'($DAN_PUBLIC_KEY, $NFT_ID, 3)'"
 echo == owner of token3
 eval dfx canister call token_ERC721 ownerOf "'(3)'"
 

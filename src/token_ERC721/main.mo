@@ -246,7 +246,14 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
 
     private func _clearApproval(owner: Principal, tokenId: Nat) {
         assert(_ownerOf(tokenId) != null and Option.unwrap<Principal>(_ownerOf(tokenId)) == owner);
-        tokenApprovals.delete(tokenId);
+        switch (tokenApprovals.get(tokenId)) {
+            case (?operator) {
+                tokenApprovals.delete(tokenId);
+            };
+            case (_) {
+                ();
+            }
+        }
     };
 
     /**
@@ -260,7 +267,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
             case (?owner_balance, ?tokenList ) {
                 // 1. update balances
                 let owner_balcance_new = owner_balance - 1;
-                assert(owner_balcance_new > owner_balance);
+                assert(owner_balcance_new < owner_balance);
                 balances.put(owner, owner_balcance_new);
                 // 2. update ownered
                 ownered.delete(tokenId);

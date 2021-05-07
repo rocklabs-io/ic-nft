@@ -4,3 +4,8 @@
 
 参考 [motoko-token/demo.sh](https://github.com/dfinance-tech/motoko-token/blob/master/demo.sh) 也写一个测试脚本测一下
 
+## Test
+```sh
+sudo sh ./demo.sh
+```
+
