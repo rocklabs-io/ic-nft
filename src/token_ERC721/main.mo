@@ -10,13 +10,13 @@ import List "mo:base/List";
 /**
  *  Implementation of https://github.com/icplabs/DIPs/blob/main/DIPS/dip-721.md Non-Fungible Token Standard.
  */
-shared(msg) actor class Token_ERC721() = this {
+shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principal) = this {
 
     // Token name
-    private stable var name_ : Text = "";
+    private stable var name_ : Text = _name;
 
     // Token symbol
-    private stable var symbol_ : Text = "";
+    private stable var symbol_ : Text = _symbol;
 
     // token admins
     private var admins = HashMap.HashMap<Principal, Bool>(1, Principal.equal, Principal.hash);
@@ -46,7 +46,7 @@ shared(msg) actor class Token_ERC721() = this {
 
     private var allTokensIndex = HashMap.HashMap<Nat, Nat>(1, Nat.equal, Hash.hash);
 
-    admins.put(msg.caller, true);
+    admins.put(admin, true);
 
     // private query function
 
@@ -172,7 +172,16 @@ shared(msg) actor class Token_ERC721() = this {
                 ownedTokensIndex.put(tokenId, length);
             };
             case (_) {
-                assert(false);
+                // 1. update ownered
+                ownered.put(tokenId, to);
+                // 2. update balances
+                let to_balance_new = 1;
+                balances.put(to, to_balance_new);
+                // 3. update ownedTokens of to
+                let new = List.make<Nat>(tokenId);
+                ownedTokens.put(to, new);
+                // 4. update ownedTokensIndex
+                ownedTokensIndex.put(tokenId, 1);
             };
         }
     };    
@@ -489,6 +498,17 @@ shared(msg) actor class Token_ERC721() = this {
         return tokens;
     };
 
+    public query func isAdmin(who: Principal) : async Bool {
+        switch (admins.get(who)) {
+            case (?res) {
+                return res;                
+            };
+            case (_) {
+                return false;
+            };
+        }
+    };
+
 
     // public modify function 
 
@@ -549,7 +569,7 @@ shared(msg) actor class Token_ERC721() = this {
      * @param _tokenId The NFT to transfer
      */
     public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
-        return  _transferFrom(msg.caller, from, to , tokenId);
+        return  _transferFrom(msg.caller, from, to, tokenId);
     };
 
     public shared(msg) func safeTransferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
@@ -557,7 +577,7 @@ shared(msg) actor class Token_ERC721() = this {
     };
 
     public shared(msg) func safeTransferFromWithData(from: Principal, to: Principal, tokenId: Nat, data: Text) : async Bool {
-        return  _safeTransferFrom(msg.caller, from, to , tokenId, data);
+        return  _safeTransferFrom(msg.caller, from, to, tokenId, data);
     };
 
     public shared(msg) func setTokenURI(tokenId: Nat, uri: Text) : async Bool {
@@ -596,6 +616,12 @@ shared(msg) actor class Token_ERC721() = this {
         _clearApproval(owner, tokenId);
         _removeTokenFrom(owner, tokenId);
         _addTokenTo(to, tokenId);
+        return true;
+    };
+
+    public shared(msg) func setAdmin(who: Principal, isOr: Bool) : async Bool {
+        assert(Option.unwrap(admins.get(msg.caller)));
+        admins.put(who, isOr);
         return true;
     };
 };
