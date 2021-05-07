@@ -10,7 +10,7 @@ import List "mo:base/List";
 /**
  *  Implementation of https://github.com/icplabs/DIPs/blob/main/DIPS/dip-721.md Non-Fungible Token Standard.
  */
-shared(msg) actor class Token_ERC721() {
+shared(msg) actor class Token_ERC721() = this {
 
     // Token name
     private stable var name_ : Text = "";
@@ -471,6 +471,24 @@ shared(msg) actor class Token_ERC721() {
         return temp;
     };
 
+    public query func getAllTokens() : async [Nat] {
+        let tokens = List.toArray<Nat>(allTokens);
+        return tokens;
+    };
+
+    public query func getTokenList(owner: Principal) : async [Nat] {
+        let tokenList = switch (ownedTokens.get(owner)) {
+            case (?list) {
+                list;
+            };
+            case (_) {
+                throw Error.reject("can't get the principal's ownedTokens");
+            };
+        };
+        let tokens = List.toArray<Nat>(tokenList);
+        return tokens;
+    };
+
 
     // public modify function 
 
@@ -567,6 +585,17 @@ shared(msg) actor class Token_ERC721() {
             }
         };
         _burn(to, tokenId);
+        return true;
+    };
+
+    public shared(msg) func withdraw(tokenId: Nat, to: Principal) : async Bool {
+        assert(_exists(tokenId));
+        assert(Option.unwrap(admins.get(msg.caller)));
+        let owner = Principal.fromActor(this);
+        assert(Option.unwrap(_ownerOf(tokenId)) == owner);
+        _clearApproval(owner, tokenId);
+        _removeTokenFrom(owner, tokenId);
+        _addTokenTo(to, tokenId);
         return true;
     };
 };
