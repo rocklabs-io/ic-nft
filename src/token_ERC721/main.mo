@@ -384,7 +384,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
      * @param _tokenId The identifier for an NFT
      * @return The address of the owner of the NFT
      */
-     public func ownerOf(tokenId: Nat) : async Principal {
+     public query func ownerOf(tokenId: Nat) : async Principal {
         switch (_ownerOf(tokenId)) {
             case (? owner) {
                 return owner;
