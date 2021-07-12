@@ -24,6 +24,6 @@
 
 ## Test
 ```sh
-sudo sh ./demo.s
+sudo sh ./demo.sh
 ```
 
