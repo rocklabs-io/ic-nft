@@ -81,23 +81,6 @@ actor Token_ERC721{
     *@param nft_id : owner's NFT Principal
     *@param target_NFT_Id : target compound NFT 
     **/
-    public shared(msg) func compoundNFT(nft_id : [Principal], target_NFT_Id : Principal) : async Bool{
-        // all NFT is belong to msg.caller
-        var number = 0;
-        for ((l,v) in nft_id.entries()){
-            if (msg.caller == switch(ownered.get(v)){
-                case (?principal) { principal };
-                case (_) { () };
-            }) {
-                number += 1;
-            };
-        };
-        assert(number == nft_id.sieze());
-        assert()
-
-
-    };
-
 
 
 }
