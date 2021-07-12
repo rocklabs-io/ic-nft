@@ -67,7 +67,7 @@ public shared(msg) func setApprovalForAll(_operator: Principal, _approved: Bool)
 /// @dev Throws if `_tokenId` is not a valid NFT.
 /// @param _tokenId The NFT to find the approved address for
 /// @return The approved address for this NFT, or the zero address if there is none
-public query func getApproved (_tokenId: Principal) : async Principal {
+public query func getApproved (_tokenId: Nat) : async Principal {
 
 /// @notice Query if an address is an authorized operator for another address
 /// @param _owner The address that owns the NFTs
