@@ -266,7 +266,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
         switch(balances.get(owner), ownedTokens.get(owner)) {
             case (?owner_balance, ?tokenList ) {
                 // 1. update balances
-                let owner_balcance_new = owner_balance - 1;
+                let owner_balcance_new : Nat = owner_balance - 1;
                 assert(owner_balcance_new < owner_balance);
                 balances.put(owner, owner_balcance_new);
                 // 2. update ownered
