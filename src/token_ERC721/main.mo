@@ -6,12 +6,19 @@ import Nat "mo:base/Nat";
 import Hash "mo:base/Hash";
 import Text "mo:base/Text";
 import List "mo:base/List";
+import Time "mo:base/Time";
 
 /**
  *  Implementation of https://github.com/icplabs/DIPs/blob/main/DIPS/dip-721.md Non-Fungible Token Standard.
  */
 shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principal) = this {
 
+    private stable let POW_NONCE_LIFETIME : Time.Time = 30 * 1_000_000_000;
+    private stable let DIFFICULTY : Nat = 2;
+    type ProofOfWork =  {
+        timestamp: Time.Time;
+        nonce: Nat64;
+    };
     // Token name
     private stable var name_ : Text = _name;
 
@@ -64,6 +71,10 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
                 return false;
             };
         }
+    };
+
+    private func _secs_to_nanos(secs: Time.Time) : Time.Time {
+        secs * 1_000_000_000
     };
 
     private func _ownerOf(tokenId: Nat) : ?Principal {
