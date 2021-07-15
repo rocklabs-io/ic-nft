@@ -12,12 +12,8 @@ import Time "mo:base/Time";
  *  Implementation of https://github.com/icplabs/DIPs/blob/main/DIPS/dip-721.md Non-Fungible Token Standard.
  */
 shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principal) = this {
-
-    private stable let POW_NONCE_LIFETIME : Time.Time = 30 * 1_000_000_000;
-    private stable let DIFFICULTY : Nat = 2;
-    type ProofOfWork =  {
-        timestamp: Time.Time;
-        nonce: Nat64;
+    type TokenActor = actor {
+        transferFrom : (from: Principal, to: Principal, value: Nat) -> async Bool;
     };
     // Token name
     private stable var name_ : Text = _name;
@@ -55,6 +51,12 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
 
     admins.put(admin, true);
 
+    private var erc20TokenCanister : Principal = admin;
+
+    private var mintPrice : Nat = 0;
+
+    private var mintFeePool : Principal = admin;
+
     // private query function
 
     /**
@@ -71,10 +73,6 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
                 return false;
             };
         }
-    };
-
-    private func _secs_to_nanos(secs: Time.Time) : Time.Time {
-        secs * 1_000_000_000
     };
 
     private func _ownerOf(tokenId: Nat) : ?Principal {
@@ -527,6 +525,17 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
         }
     };
 
+    public query func tokenCanisterId() : async Principal {
+        return erc20TokenCanister;
+    };
+
+    public query func mintNftPrice() : async Nat {
+        return mintPrice;
+    };
+
+    public query func mintFeePoolId() : async Principal {
+        return mintFeePool;
+    };
 
     // public modify function 
 
@@ -605,9 +614,10 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
     };
 
     public shared(msg) func mint(to: Principal, tokenId: Nat) : async Bool {
-        assert(Option.unwrap(admins.get(msg.caller)));
         assert(not _exists(tokenId));
+        let erc20 : TokenActor = actor(Principal.toText(erc20TokenCanister));
         _mint(to, tokenId);
+        assert(await erc20.transferFrom(msg.caller, mintFeePool, mintPrice));
         return true;
     };
 
@@ -640,6 +650,18 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
     public shared(msg) func setAdmin(who: Principal, isOr: Bool) : async Bool {
         assert(Option.unwrap(admins.get(msg.caller)));
         admins.put(who, isOr);
+        return true;
+    };
+
+    public shared(msg) func setErc20(token: Principal) : async Bool {
+        assert(Option.unwrap(admins.get(msg.caller)));
+        erc20TokenCanister := token;
+        return true;
+    };
+
+    public shared(msg) func setPrice(price: Nat) : async Bool {
+        assert(Option.unwrap(admins.get(msg.caller)));
+        mintPrice := price;
         return true;
     };
 };
