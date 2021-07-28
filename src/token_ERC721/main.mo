@@ -7,6 +7,8 @@ import Hash "mo:base/Hash";
 import Text "mo:base/Text";
 import List "mo:base/List";
 import Time "mo:base/Time";
+import TrieSet "mo:base/TrieSet";
+import Array "mo:base/Array";
 
 /**
  *  Implementation of https://github.com/icplabs/DIPs/blob/main/DIPS/dip-721.md Non-Fungible Token Standard.
@@ -56,6 +58,8 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
     private var mintPrice : Nat = 0;
 
     private var mintFeePool : Principal = admin;
+
+    private var favourites = HashMap.HashMap<Principal, TrieSet.Set<Nat>>(1, Principal.equal, Principal.hash);
 
     // private query function
 
@@ -616,8 +620,8 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
     public shared(msg) func mint(to: Principal, tokenId: Nat) : async Bool {
         assert(not _exists(tokenId));
         let erc20 : TokenActor = actor(Principal.toText(erc20TokenCanister));
-        _mint(to, tokenId);
         assert(await erc20.transferFrom(msg.caller, mintFeePool, mintPrice));
+        _mint(to, tokenId);
         return true;
     };
 
@@ -659,9 +663,50 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
         return true;
     };
 
-    public shared(msg) func setPrice(price: Nat) : async Bool {
+    public shared(msg) func setFeePrice(price: Nat) : async Bool {
         assert(Option.unwrap(admins.get(msg.caller)));
         mintPrice := price;
         return true;
+    };
+
+    public shared(msg) func setFeePool(pool: Principal) : async Bool {
+        assert(Option.unwrap(admins.get(msg.caller)));
+        mintFeePool := pool;
+        return true;
+    };
+
+    public shared(msg) func favourite(tokenId: Nat) : async Bool {
+        assert(_exists(tokenId));
+        if (Option.isNull(favourites.get(msg.caller))) {
+            var new = TrieSet.empty<Nat>();
+            new := TrieSet.put<Nat>(new, tokenId, Hash.hash(tokenId), Nat.equal);
+            favourites.put(msg.caller, new);
+        } else {
+            var new = Option.unwrap(favourites.get(msg.caller));
+            new := TrieSet.put<Nat>(new, tokenId, Hash.hash(tokenId), Nat.equal);
+            favourites.put(msg.caller, new);            
+        };
+        return true;
+    };
+
+    public query func getFavourites(who: Principal) : async [Nat] {
+        switch (favourites.get(who)) {
+            case (?f) {
+                return TrieSet.toArray(f);
+            };
+            case (_) {
+                return [];
+            };
+        }
+    };
+
+    public query func getFavouritedBy(tokenId: Nat) : async [Principal] {
+        var temp : [Principal] = [];
+        for ((k, v) in favourites.entries()) {
+            if (TrieSet.mem(v, tokenId, Hash.hash(tokenId), Nat.equal)) {
+                temp := Array.append(temp, Array.make(k));
+            };
+        };
+        return temp;
     };
 };

@@ -3,6 +3,10 @@
     "token_ERC721": {
       "main": "src/token_ERC721/main.mo",
       "type": "motoko"
+    },
+    "token_ERC20": {
+      "main": "./ic-token/motoko/erc20-simple-storage/src/token.mo",
+      "type": "motoko"
     }
   },
   "defaults": {

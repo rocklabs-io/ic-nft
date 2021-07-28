@@ -1,0 +1,3 @@
+[submodule "ic-token"]
+	path = ic-token
+	url = git@github.com:dfinance-tech/ic-token.git
