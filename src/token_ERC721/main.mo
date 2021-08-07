@@ -17,17 +17,37 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
     type TokenActor = actor {
         transferFrom : (from: Principal, to: Principal, value: Nat) -> async Bool;
     };
+
+    type TokenInfo = {
+        tokenId: Nat;
+        owner: Principal;
+        var url: Text;
+        var tokenName: Text;
+        var tokenDescription: Text;
+        tokenCreateTime: Time.Time;
+    };
+
+    type TokenInfoExt = {
+        tokenId: Nat;
+        owner: Principal;
+        url: Text;
+        tokenName: Text;
+        tokenDescription: Text;
+        tokenCreateTime: Time.Time;
+    };
+
     // Token name
     private stable var name_ : Text = _name;
 
     // Token symbol
     private stable var symbol_ : Text = _symbol;
 
+    private stable var tokenidget : Nat = 0;
     // token admins
     private var admins = HashMap.HashMap<Principal, Bool>(1, Principal.equal, Principal.hash);
 
-    //the Uniform Resource Identifier (URI) for `tokenId` token.
-    private var tokenURIs_ = HashMap.HashMap<Nat, Text>(1, Nat.equal, Hash.hash);
+    //the Uniform Resource Identifier (URI) and other token info for `tokenId` token.
+    private var tokenInfos_ = HashMap.HashMap<Nat, TokenInfo>(1, Nat.equal, Hash.hash);
 
     // Mapping from token ID to owner address
     private var ownered = HashMap.HashMap<Nat, Principal>(1, Nat.equal, Hash.hash);
@@ -51,7 +71,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
 
     private var allTokensIndex = HashMap.HashMap<Nat, Nat>(1, Nat.equal, Hash.hash);
 
-    admins.put(admin, msg.caller);
+    admins.put(admin, true);
 
     private var erc20TokenCanister : Principal = admin;
 
@@ -85,6 +105,17 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
 
     private func _balanceOf(who: Principal) : ?Nat {
         return balances.get(who);
+    };
+
+    private func _tokenInfotoExt(info: TokenInfo) : TokenInfoExt {
+        return {
+            tokenId = info.tokenId;
+            owner = info.owner;
+            url = info.url;
+            tokenName = info.tokenName;
+            tokenDescription = info.tokenDescription;
+            tokenCreateTime = info.tokenCreateTime;
+        }:TokenInfoExt;
     };
 
     /**
@@ -221,7 +252,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
     private func _burn(owner: Principal, tokenId: Nat) {
         _clearApproval(owner, tokenId);
         _removeTokenFrom(owner, tokenId);
-        tokenURIs_.delete(tokenId);
+        tokenInfos_.delete(tokenId);
 
         let tokenIndex = switch (allTokensIndex.get(tokenId)) {
             case (?index) {
@@ -331,10 +362,14 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
         }
     };
 
-    //set Token URI
-    private func _setTokenURI(tokenId : Nat, uri: Text) {
+    //set Token Info
+    private func _setTokenInfo(tokenId : Nat, uri: Text, name: Text, description: Text) {
         assert(_exists(tokenId));
-        tokenURIs_.put(tokenId, uri)
+        let info = Option.unwrap(tokenInfos_.get(tokenId));
+        info.url := uri;
+        info.tokenName := name;
+        info.tokenDescription := description;
+        tokenInfos_.put(tokenId, info);
     };
 
     /**
@@ -379,13 +414,13 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
     /**
      * @dev See {IERC721Metadata-tokenURI}.
      */
-    public query func tokenURI(tokenId: Nat) : async Text {
-        switch(tokenURIs_.get(tokenId)){
-            case(?uri){
-                uri;
+    public query func tokenInfo(tokenId: Nat) : async TokenInfoExt {
+        switch(tokenInfos_.get(tokenId)){
+            case(?tokeninfo){
+                return _tokenInfotoExt(tokeninfo);
             };
             case(_){
-                "ERC721Metadata: URI query for nonexistent token";
+                throw Error.reject("ERC721Metadata: info query for nonexistent token");
             };
         };
     };
@@ -611,17 +646,27 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
         return  _safeTransferFrom(msg.caller, from, to, tokenId, data);
     };
 
-    public shared(msg) func setTokenURI(tokenId: Nat, uri: Text) : async Bool {
+    public shared(msg) func setTokenInfo(tokenId: Nat, uri: Text, tokenName: Text, tokenDescription: Text) : async Bool {
         assert(Option.unwrap(_ownerOf(tokenId)) == msg.caller);
-        _setTokenURI(tokenId, uri);
+        _setTokenInfo(tokenId, uri, tokenName, tokenDescription);
         return true;
     };
 
-    public shared(msg) func mint(to: Principal, tokenId: Nat) : async Bool {
-        assert(not _exists(tokenId));
+    public shared(msg) func mint(to: Principal, tokenUrl: Text, tokenName: Text, tokenDescription: Text) : async Bool {
+        let tokenId = tokenidget;
+        tokenidget +=  1;
         let erc20 : TokenActor = actor(Principal.toText(erc20TokenCanister));
         assert(await erc20.transferFrom(msg.caller, mintFeePool, mintPrice));
         _mint(to, tokenId);
+        let tokenInfo_ : TokenInfo = {
+            tokenId = tokenId;
+            owner = to;
+            var url = tokenUrl;
+            var tokenName = tokenName;
+            var tokenDescription = tokenDescription;
+            tokenCreateTime = Time.now();
+        };
+        tokenInfos_.put(tokenId, tokenInfo_);
         return true;
     };
 
