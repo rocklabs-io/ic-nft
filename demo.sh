@@ -69,12 +69,28 @@ eval dfx canister --no-wallet call token_ERC721 symbol
 
 
 echo == Alice Mint 3 NFT to self, 3 NFT to Bob, all True
-eval dfx canister --no-wallet call token_ERC721 mint "'($ALICE_PUBLIC_KEY, 0)'"
-eval dfx canister --no-wallet call token_ERC721 mint "'($BOB_PUBLIC_KEY, 1)'"
-eval dfx canister --no-wallet call token_ERC721 mint "'($ALICE_PUBLIC_KEY, 2)'"
-eval dfx canister --no-wallet call token_ERC721 mint "'($BOB_PUBLIC_KEY, 3)'"
-eval dfx canister --no-wallet call token_ERC721 mint "'($ALICE_PUBLIC_KEY, 4)'"
-eval dfx canister --no-wallet call token_ERC721 mint "'($BOB_PUBLIC_KEY, 5)'"
+eval dfx canister --no-wallet call token_ERC721 mint "'($ALICE_PUBLIC_KEY, \"a.link/1\", \"token 1\", \"the 1 nft in here\")'"
+eval dfx canister --no-wallet call token_ERC721 mint "'($BOB_PUBLIC_KEY, \"a.link/2\", \"token 2\", \"the 2 nft in here\")'"
+eval dfx canister --no-wallet call token_ERC721 mint "'($ALICE_PUBLIC_KEY, \"a.link/3\", \"token 3\", \"the 3 nft in here\")'"
+eval dfx canister --no-wallet call token_ERC721 mint "'($BOB_PUBLIC_KEY, \"a.link/4\", \"token 4\", \"the 4 nft in here\")'"
+eval dfx canister --no-wallet call token_ERC721 mint "'($ALICE_PUBLIC_KEY, \"a.link/5\", \"token 5\", \"the 5 nft in here\")'"
+eval dfx canister --no-wallet call token_ERC721 mint "'($BOB_PUBLIC_KEY, \"a.link/6\", \"token 6\", \"the 6 nft in here\")'"
+
+echo == get token info
+eval dfx canister --no-wallet call token_ERC721 tokenInfo "'(1)'"
+eval dfx canister --no-wallet call token_ERC721 tokenInfo "'(2)'"
+eval dfx canister --no-wallet call token_ERC721 tokenInfo "'(3)'"
+eval dfx canister --no-wallet call token_ERC721 tokenInfo "'(4)'"
+eval dfx canister --no-wallet call token_ERC721 tokenInfo "'(5)'"
+eval dfx canister --no-wallet call token_ERC721 tokenInfo "'(6)'"
+
+echo == alice change the token info of 1, true
+eval dfx canister --no-wallet call token_ERC721 setTokenInfo "'(1, \"nft.com/1/\", \"nft token 1\", \"nft 1 in Dfinity/\")'"
+eval dfx canister --no-wallet call token_ERC721 tokenInfo "'(1)'"
+
+echo == alice change the token info of 2, false, not the owner
+eval dfx canister --no-wallet call token_ERC721 setTokenInfo "'(2, \"nft.com/2/\", \"nft token 2\", \"nft 2 in Dfinity/\")'"
+
 
 echo == fee pool balance
 eval dfx canister --no-wallet call token_ERC20 balanceOf "'($FEE_PUBLIC_KEY)'"
@@ -299,5 +315,7 @@ eval dfx canister --no-wallet call token_ERC721 getFavouritedBy "'(2)'"
 eval dfx canister --no-wallet call token_ERC721 getFavouritedBy "'(3)'"
 eval dfx canister --no-wallet call token_ERC721 getFavouritedBy "'(5)'"
 eval dfx canister --no-wallet call token_ERC721 getFavouritedBy "'(0)'"
+
+echo
 
 dfx stop

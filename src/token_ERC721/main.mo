@@ -42,7 +42,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
     // Token symbol
     private stable var symbol_ : Text = _symbol;
 
-    private stable var tokenidget : Nat = 0;
+    private stable var tokenidget : Nat = 1;
     // token admins
     private var admins = HashMap.HashMap<Principal, Bool>(1, Principal.equal, Principal.hash);
 
@@ -652,7 +652,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
         return true;
     };
 
-    public shared(msg) func mint(to: Principal, tokenUrl: Text, tokenName: Text, tokenDescription: Text) : async Bool {
+    public shared(msg) func mint(to: Principal, tokenUrl: Text, tokenName: Text, tokenDescription: Text) : async Nat {
         let tokenId = tokenidget;
         tokenidget +=  1;
         let erc20 : TokenActor = actor(Principal.toText(erc20TokenCanister));
@@ -667,7 +667,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
             tokenCreateTime = Time.now();
         };
         tokenInfos_.put(tokenId, tokenInfo_);
-        return true;
+        return tokenId;
     };
 
     public shared(msg) func burn(tokenId: Nat) : async Bool {
