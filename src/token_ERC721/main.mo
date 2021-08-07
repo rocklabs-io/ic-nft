@@ -51,7 +51,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
 
     private var allTokensIndex = HashMap.HashMap<Nat, Nat>(1, Nat.equal, Hash.hash);
 
-    admins.put(admin, true);
+    admins.put(admin, msg.caller);
 
     private var erc20TokenCanister : Principal = admin;
 
@@ -422,7 +422,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
                 return balance;
             };
             case _ {
-                throw Error.reject("Failed to query balance")
+                return 0;
             };
         }
     };
@@ -441,7 +441,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
                         return who;
                     };
                     case (_) {
-                        throw Error.reject("Failed to get approved")
+                        return Principal.fromText("aaaaa-aa");
                     };
                 }                
             };

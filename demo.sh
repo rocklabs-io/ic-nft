@@ -135,7 +135,7 @@ eval dfx canister --no-wallet call token_ERC721 tokenByIndex "'(4)'"
 eval dfx canister --no-wallet call token_ERC721 tokenByIndex "'(5)'"
 eval dfx canister --no-wallet call token_ERC721 tokenByIndex "'(6)'"
 
-echo == get balance 3,3, error
+echo == get balance 3,3, 0
 eval dfx canister --no-wallet call token_ERC721 balanceOf "'($ALICE_PUBLIC_KEY)'"
 eval dfx canister --no-wallet call token_ERC721 balanceOf "'($BOB_PUBLIC_KEY)'"
 eval dfx canister --no-wallet call token_ERC721 balanceOf "'($DAN_PUBLIC_KEY)'"
