@@ -20,7 +20,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
 
     type TokenInfo = {
         tokenId: Nat;
-        owner: Principal;
+        var owner: Principal;
         var url: Text;
         var tokenName: Text;
         var tokenDescription: Text;
@@ -372,6 +372,13 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
         tokenInfos_.put(tokenId, info);
     };
 
+    private func _changeTokenInfoOwner(tokenId: Nat, owner: Principal) {
+        assert(_exists(tokenId));
+        let info = Option.unwrap(tokenInfos_.get(tokenId));
+        info.owner := owner;
+        tokenInfos_.put(tokenId, info);
+    };
+
     /**
      * @dev Transfers `tokenId` from `from` to `to`.
      *  As opposed to {transferFrom}, this imposes no restrictions on msg.caller.
@@ -385,6 +392,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
         _clearApproval(from, tokenId);
         _removeTokenFrom(from, tokenId);
         _addTokenTo(to, tokenId);
+        _changeTokenInfoOwner(tokenId, to);
         return true;
     };    
 
