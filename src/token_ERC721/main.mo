@@ -668,7 +668,7 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
         _mint(to, tokenId);
         let tokenInfo_ : TokenInfo = {
             tokenId = tokenId;
-            owner = to;
+            var owner = to;
             var url = tokenUrl;
             var tokenName = tokenName;
             var tokenDescription = tokenDescription;
