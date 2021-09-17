@@ -9,14 +9,24 @@ import List "mo:base/List";
 import Time "mo:base/Time";
 import TrieSet "mo:base/TrieSet";
 import Array "mo:base/Array";
+import Debug "mo:base/Debug";
+import Result "mo:base/Result";
 
 /**
  *  Implementation of https://github.com/icplabs/DIPs/blob/main/DIPS/dip-721.md Non-Fungible Token Standard.
  */
 shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principal) = this {
+
+    // returns tx index or error msg
+    type TxReceipt = Result.Result<Nat, {
+        #InsufficientBalance;
+        #InsufficientAllowance;
+    }>;
     type TokenActor = actor {
-        transferFrom : (from: Principal, to: Principal, value: Nat) -> async Bool;
+        transferFrom : (from: Principal, to: Principal, value: Nat) -> async TxReceipt;
     };
+
+
 
     type TokenInfo = {
         tokenId: Nat;
@@ -663,8 +673,13 @@ shared(msg) actor class Token_ERC721(_name: Text, _symbol: Text, admin: Principa
     public shared(msg) func mint(to: Principal, tokenUrl: Text, tokenName: Text, tokenDescription: Text) : async Nat {
         let tokenId = tokenidget;
         tokenidget +=  1;
+        Debug.print("test1");
         let erc20 : TokenActor = actor(Principal.toText(erc20TokenCanister));
-        assert(await erc20.transferFrom(msg.caller, mintFeePool, mintPrice));
+
+        //assert(await erc20.transferFrom(msg.caller, mintFeePool, mintPrice));
+        //assert（Result.isOk(await erc20.transferFrom(msg.caller, mintFeePool, mintPrice))）;
+        Result.assertOk(await erc20.transferFrom(msg.caller, mintFeePool, mintPrice));
+        Debug.print("test2");
         _mint(to, tokenId);
         let tokenInfo_ : TokenInfo = {
             tokenId = tokenId;
