@@ -3,6 +3,7 @@ import Principal "mo:base/Principal";
 import Error "mo:base/Error";
 import Option "mo:base/Option";
 import Nat "mo:base/Nat";
+import Int "mo:base/Int";
 import Hash "mo:base/Hash";
 import Text "mo:base/Text";
 import List "mo:base/List";
@@ -40,7 +41,7 @@ shared(msg) actor class NFToken(
     private stable var name_ : Text = _name;
     private stable var symbol_ : Text = _symbol;
     private stable var owner_: Principal = _owner;
-    private stable var totalSupply: Nat = 0;
+    private stable var totalSupply_: Nat = 0;
     private stable var blackhole: Principal = Principal.fromText("aaaaa-aa");
 
     private var tokens = HashMap.HashMap<Nat, TokenInfo>(1, Nat.equal, Hash.hash);
@@ -74,7 +75,7 @@ shared(msg) actor class NFToken(
     private func _balanceOf(who: Principal) : Nat {
         switch (ownedTokens.get(who)) {
             case (?tokens) {
-                return tokens.size();
+                return Int.abs(tokens.size());
             };
             case (_) {
                 return 0;
@@ -220,27 +221,26 @@ shared(msg) actor class NFToken(
     };
 
     private func _mint(to: Principal, url: Text, name: Text, desc: Text) {
-        assert(_exists(tokenId) == false);
         let token: TokenInfo = {
-            index = totalSupply;
-            owner = to;
-            url = url;
-            name = name;
-            desc = desc;
+            index = totalSupply_;
+            var owner = to;
+            var url = url;
+            var name = name;
+            var desc = desc;
             timestamp = Time.now();
         };
-        tokens.put(totalSupply, token);
-        _addTokenTo(to, totalSupply);
-        totalSupply += 1;
+        tokens.put(totalSupply_, token);
+        _addTokenTo(to, totalSupply_);
+        totalSupply_ += 1;
     };
 
     private func _updateTokenInfo(info: TokenInfo) {
         assert(_exists(info.index));
-        let token = Option.unwrap(tokens.get(tokenId));
-        token.owner := owner;
-        token.url := url;
-        token.name := name;
-        token.desc := desc;
+        let token = Option.unwrap(tokens.get(info.index));
+        token.owner := info.owner;
+        token.url := info.url;
+        token.name := info.name;
+        token.desc := info.desc;
         tokens.put(info.index, token);
     };
 
@@ -287,7 +287,7 @@ shared(msg) actor class NFToken(
         return  _transferFrom(msg.caller, from, to, tokenId);
     };
 
-    public shared(msg) func setTokenInfo(info: TokenInfo) : async Bool {
+    public shared(msg) func setTokenInfo(info: TokenInfoExt) : async Bool {
         assert(Option.unwrap(_ownerOf(info.index)) == msg.caller);
         _updateTokenInfo(info);
         return true;
@@ -303,7 +303,7 @@ shared(msg) actor class NFToken(
     };
 
     public query func getTokenInfo(tokenId: Nat) : async TokenInfoExt {
-        switch(tokenInfos_.get(tokenId)){
+        switch(tokens.get(tokenId)){
             case(?tokeninfo){
                 return _tokenInfotoExt(tokeninfo);
             };
@@ -325,14 +325,7 @@ shared(msg) actor class NFToken(
     };
 
     public query func balanceOf(who: Principal) : async Nat {
-        switch (_balanceOf(who)) {
-            case (? balance) {
-                return balance;
-            };
-            case _ {
-                return 0;
-            };
-        }
+        return _balanceOf(who);
     };
  
     public query func getApproved(tokenId: Nat) : async Principal {
@@ -386,7 +379,7 @@ shared(msg) actor class NFToken(
     };
 
     public query func totalSupply() : async Nat {
-        return totalSupply;
+        return totalSupply_;
     };
 
     public query func tokenByIndex(index: Nat) : async Nat {
