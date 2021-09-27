@@ -1,2 +1,2 @@
-## Non-fungible Token Standard for the IC
+## Non-fungible Token Standard for the IC[WIP]
 
