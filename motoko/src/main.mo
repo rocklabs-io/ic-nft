@@ -8,10 +8,12 @@ import Hash "mo:base/Hash";
 import Text "mo:base/Text";
 import List "mo:base/List";
 import Time "mo:base/Time";
+import Iter "mo:base/Iter";
 import TrieSet "mo:base/TrieSet";
 import Array "mo:base/Array";
 import Debug "mo:base/Debug";
-import Result "mo:base/Result";
+import Prelude "mo:base/Prelude";
+
 
 
 shared(msg) actor class NFToken(
@@ -27,6 +29,7 @@ shared(msg) actor class NFToken(
         var name: Text;
         var desc: Text;
         timestamp: Time.Time;
+        var approval: ?Principal;
     };
 
     type TokenInfoExt = {
@@ -36,6 +39,21 @@ shared(msg) actor class NFToken(
         name: Text;
         desc: Text;
         timestamp: Time.Time;
+        approval: ?Principal;
+    };
+
+    type UserInfo = {
+        var allows: TrieSet.Set<Principal>;         // owner 允许这些人代替他操作，用于权限检查
+        var allowedBy: TrieSet.Set<Principal>;      // owner 可以操作的账号，仅用于快速查询
+        var allowedIds: TrieSet.Set<Nat>;           // owner 可以操作的 id，仅用于快速查询
+        var tokens: TrieSet.Set<Nat>;               // owner 拥有的 id, 仅用于快速查询
+    };
+
+    type UserInfoExt = {
+        allows: [Principal];
+        allowedBy: [Principal];
+        allowedIds: [Nat];
+        tokens: [Nat];
     };
 
     private stable var name_ : Text = _name;
@@ -45,41 +63,56 @@ shared(msg) actor class NFToken(
     private stable var blackhole: Principal = Principal.fromText("aaaaa-aa");
 
     private var tokens = HashMap.HashMap<Nat, TokenInfo>(1, Nat.equal, Hash.hash);
-    private var tokenApprovals = HashMap.HashMap<Nat, Principal>(1, Nat.equal, Hash.hash);
-    private var operatorApprovals = HashMap.HashMap<Principal, HashMap.HashMap<Principal, Bool>>(1, Principal.equal, Principal.hash);
-    private var ownedTokens = HashMap.HashMap<Principal, List.List<Nat>>(1, Principal.equal, Principal.hash);
+    private var users = HashMap.HashMap<Principal, UserInfo>(1, Principal.equal, Principal.hash);
 
-
+    private func _unwrap<T>(x : ?T) : T =
+    switch x {
+      case null { Prelude.unreachable() };
+      case (?x_) { x_ };
+    };
+    
     private func _exists(tokenId: Nat) : Bool {
         switch (tokens.get(tokenId)) {
-            case (?info) {
-                return true;
-            };
-            case (_) {
-                return false;
-            };
+            case (?info) { return true; };
+            case _ { return false; };
         }
     };
 
     private func _ownerOf(tokenId: Nat) : ?Principal {
         switch (tokens.get(tokenId)) {
-            case (?info) {
-                return ?info.owner;
-            };
-            case (_) {
-                return null;
-            };
+            case (?info) { return ?info.owner; };
+            case (_) { return null; };
         }
     };
 
+    private func _isOwner(who: Principal, tokenId: Nat) : Bool {
+        switch (tokens.get(tokenId)) {
+            case (?info) { return info.owner == who; };
+            case _ { return false; };
+        };
+    };
+
+    private func _isApprover(who: Principal, tokenId: Nat) : Bool {
+        switch (tokens.get(tokenId)) {
+            case (?info) { return info.approval == ?who; };
+            case _ { return false; };
+        }
+    };
+    
+
     private func _balanceOf(who: Principal) : Nat {
-        switch (ownedTokens.get(who)) {
-            case (?tokens) {
-                return Int.abs(tokens.size());
-            };
-            case (_) {
-                return 0;
-            };
+        switch (users.get(who)) {
+            case (?user) { return TrieSet.size(user.tokens); };
+            case (_) { return 0; };
+        }
+    };
+
+    private func _newUser() : UserInfo {
+        {
+            var allows = TrieSet.empty<Principal>();
+            var allowedBy = TrieSet.empty<Principal>();
+            var allowedIds = TrieSet.empty<Nat>();
+            var tokens = TrieSet.empty<Nat>();
         }
     };
 
@@ -91,21 +124,34 @@ shared(msg) actor class NFToken(
             name = info.name;
             desc = info.desc;
             timestamp = info.timestamp;
+            approval = info.approval;
+        };
+    };
+
+    private func _userInfotoExt(info: UserInfo) : UserInfoExt {
+        return {
+            allows = TrieSet.toArray(info.allows);
+            allowedBy = TrieSet.toArray(info.allowedBy);
+            allowedIds = TrieSet.toArray(info.allowedIds);
+            tokens = TrieSet.toArray(info.tokens);
         };
     };
 
     private func _isApprovedOrOwner(spender: Principal, tokenId: Nat) : Bool {
-        let owner_or = _ownerOf(tokenId);
-        let appr_or = _getApproved(tokenId);
-        return ((owner_or != null and Option.unwrap(owner_or) == spender) 
-            or (appr_or != null and Option.unwrap(appr_or) == spender) 
-            or (owner_or != null and _isApprovedForAll(Option.unwrap(owner_or), spender)));
+        switch (_ownerOf(tokenId)) {
+            case (?owner) {
+                return spender == owner or _isApprover(spender, tokenId) or _isApprovedForAll(owner, spender);
+            };
+            case _ {
+                return false;
+            };
+        };        
     };
 
     private func _getApproved(tokenId: Nat) : ?Principal {
-        switch (tokenApprovals.get(tokenId)) {
-            case (?approver) {
-                return ?approver;
+        switch (tokens.get(tokenId)) {
+            case (?info) {
+                return info.approval;
             };
             case (_) {
                 return null;
@@ -114,82 +160,62 @@ shared(msg) actor class NFToken(
     };
 
     private func _isApprovedForAll(owner: Principal, operator: Principal) : Bool {
-        switch(operatorApprovals.get(owner)){
-            case (?ownerApprove) {
-                switch (ownerApprove.get(operator)) {
-                    case (?approval) {
-                        return approval;
-                    };
-                    case (_) {
-                        return false;
-                    };
-                }
+        switch (users.get(owner)) {
+            case (?user) {
+                return TrieSet.mem(user.allows, operator, Principal.hash(operator), Principal.equal);
             };
-            case (_) {
-                return false;
-            };
-        }
+            case _ { return false; };
+        };
     };
 
     private func _addTokenTo(to: Principal, tokenId: Nat) {
-        switch(ownedTokens.get(to)) {
-            case (?tokenList) {
-                let length = List.size<Nat>(tokenList);
-                let tokenIdOfList = List.make<Nat>(tokenId);
-                let tokenList_new = List.append<Nat>(tokenList, tokenIdOfList);
-                ownedTokens.put(to, tokenList_new);
+        switch(users.get(to)) {
+            case (?user) {
+                user.tokens := TrieSet.put(user.tokens, tokenId, Hash.hash(tokenId), Nat.equal);
+                users.put(to, user);
             };
-            case (_) {
-                let new = List.make<Nat>(tokenId);
-                ownedTokens.put(to, new);
+            case _ {
+                let user = _newUser();
+                user.tokens := TrieSet.put(user.tokens, tokenId, Hash.hash(tokenId), Nat.equal);
+                users.put(to, user);
             };
         }
     }; 
 
     private func _removeTokenFrom(owner: Principal, tokenId: Nat) {
-        assert(_ownerOf(tokenId) != null and Option.unwrap(_ownerOf(tokenId)) == owner);
-        switch(ownedTokens.get(owner)) {
-            case (?tokenList) {
-                // just remove tokenId from owner's list, TODO: simplify this
-                let length = List.size<Nat>(tokenList);
-                let tokenIndex = switch (ownedTokensIndex.get(tokenId)) {
-                    case (?index) {
-                        index;
-                    };
-                    case (_) {
-                        assert(false);
-                        0;
-                    };
-                };
-                let lastTokenId = switch (List.last<Nat>(tokenList)) {
-                    case (?_tokenId) {
-                        _tokenId;
-                    };
-                    case (_) {
-                        assert(false);
-                        0;
-                    };
-                };
-
-                let changeToken = func(x: Nat) : Nat {
-                    if (x == tokenId) {
-                        lastTokenId;
-                    } else {
-                        x;
-                    };
-                };
-                let tokenList_1 = List.map<Nat, Nat>(tokenList, changeToken);
-                let tokenList_2 = List.take<Nat>(tokenList_1, length - 1);
-                ownedTokens.put(owner, tokenList_2);
+        assert(_exists(tokenId) and _isOwner(owner, tokenId));
+        switch(users.get(owner)) {
+            case (?user) {
+                user.tokens := TrieSet.delete(user.tokens, tokenId, Hash.hash(tokenId), Nat.equal);
+                users.put(owner, user);
             };
-            case (_) {
+            case _ {
                 assert(false);
             };
         }
     };
 
+    private func _clearApproval(owner: Principal, tokenId: Nat) {
+        assert(_exists(tokenId) and _isOwner(owner, tokenId));
+        switch (tokens.get(tokenId)) {
+            case (?info) {
+                if (info.approval != null) {
+                    let approver = _unwrap(info.approval);
+                    let approverInfo = _unwrap(users.get(approver));
+                    approverInfo.allowedIds := TrieSet.delete(approverInfo.allowedIds, tokenId, Hash.hash(tokenId), Nat.equal);
+                    users.put(approver, approverInfo);
+                    info.approval := null;
+                    tokens.put(tokenId, info);
+                }
+            };
+            case _ {
+                assert(false);
+            };
+        }
+    };  
+
     private func _transfer(to: Principal, tokenId: Nat) {
-        assert(_exists(tokenId) == true);
+        assert(_exists(tokenId));
         switch(tokens.get(tokenId)) {
             case (?info) {
                 _removeTokenFrom(info.owner, tokenId);
@@ -202,18 +228,6 @@ shared(msg) actor class NFToken(
             };
         };
     };
-
-    private func _clearApproval(owner: Principal, tokenId: Nat) {
-        assert(_ownerOf(tokenId) != null and Option.unwrap(_ownerOf(tokenId)) == owner);
-        switch (tokenApprovals.get(tokenId)) {
-            case (?operator) {
-                tokenApprovals.delete(tokenId);
-            };
-            case (_) {
-                ();
-            }
-        }
-    };  
 
     private func _burn(owner: Principal, tokenId: Nat) {
         _clearApproval(owner, tokenId);
@@ -228,16 +242,16 @@ shared(msg) actor class NFToken(
             var name = name;
             var desc = desc;
             timestamp = Time.now();
+            var approval = null;
         };
         tokens.put(totalSupply_, token);
         _addTokenTo(to, totalSupply_);
         totalSupply_ += 1;
     };
 
-    private func _updateTokenInfo(info: TokenInfo) {
+    private func _updateTokenInfo(info: TokenInfoExt) {
         assert(_exists(info.index));
-        let token = Option.unwrap(tokens.get(info.index));
-        token.owner := info.owner;
+        let token = _unwrap(tokens.get(info.index));
         token.url := info.url;
         token.name := info.name;
         token.desc := info.desc;
@@ -262,25 +276,61 @@ shared(msg) actor class NFToken(
         };
         assert(Principal.equal(msg.caller, owner) or _isApprovedForAll(owner, msg.caller));
         assert(owner != spender);
-        tokenApprovals.put(tokenId, spender);
+        switch (tokens.get(tokenId)) {
+            case (?info) {
+                info.approval := ?spender;
+                tokens.put(tokenId, info);
+            };
+            case _ {
+                assert(false);
+            };
+        };
+        switch (users.get(spender)) {
+            case (?user) {
+                user.allowedIds := TrieSet.put(user.allowedIds, tokenId, Hash.hash(tokenId), Nat.equal);
+                users.put(spender, user);
+            };
+            case _ {
+                let user = _newUser();
+                user.allowedIds := TrieSet.put(user.allowedIds, tokenId, Hash.hash(tokenId), Nat.equal);
+                users.put(spender, user);
+            };
+        };
         return true;
     };
 
     public shared(msg) func setApprovalForAll(operator: Principal, approved: Bool) : async Bool {
         assert(msg.caller != operator);
-        switch (operatorApprovals.get(msg.caller)) {
-            case (?operatorMap) {
-                operatorMap.put(operator,approved);
-                operatorApprovals.put(msg.caller,operatorMap);
-                return true;
+        if approved {
+            let caller = switch (users.get(msg.caller)) {
+                case (?user) { user };
+                case _ { _newUser() };
             };
-            case (_) {
-                var temp = HashMap.HashMap<Principal,Bool>(1, Principal.equal, Principal.hash);
-                temp.put(operator, approved);
-                operatorApprovals.put(msg.caller,temp);
-                return true;
+            caller.allows := TrieSet.put(caller.allows, operator, Principal.hash(operator), Principal.equal);
+            users.put(msg.caller, caller);
+            let user = switch (users.get(operator)) {
+                case (?user) { user };
+                case _ { _newUser() };
             };
-        }
+            user.allowedBy := TrieSet.put(user.allowedBy, msg.caller, Principal.hash(msg.caller), Principal.equal);
+            users.put(operator, user);
+        } else {
+            switch (users.get(msg.caller)) {
+                case (?user) {
+                    user.allows := TrieSet.delete(user.allows, operator, Principal.hash(operator), Principal.equal);    
+                    users.put(msg.caller, user);
+                };
+                case _ { };
+            };
+            switch (users.get(operator)) {
+                case (?user) {
+                    user.allowedBy := TrieSet.delete(user.allowedBy, msg.caller, Principal.hash(msg.caller), Principal.equal);    
+                    users.put(operator, user);
+                };
+                case _ { };
+            };
+        };
+        return true;
     };
 
     public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
@@ -288,7 +338,7 @@ shared(msg) actor class NFToken(
     };
 
     public shared(msg) func setTokenInfo(info: TokenInfoExt) : async Bool {
-        assert(Option.unwrap(_ownerOf(info.index)) == msg.caller);
+        assert(_isOwner(msg.caller, info.index));
         _updateTokenInfo(info);
         return true;
     };
@@ -351,31 +401,16 @@ shared(msg) actor class NFToken(
     };
 
     public query func tokenOfOwnerByIndex(owner: Principal, index: Nat) : async Nat {
-        let balance = switch (_balanceOf(owner)) {
-            case (?amount) {
-                amount;
-            };
-            case (_) {
-                throw Error.reject("owner have no balance")
-            };
-        };
+        let balance = _balanceOf(owner);
         assert(index < balance);
-        let temp = switch (ownedTokens.get(owner)) {
-            case (?tokenList) {
-                switch (List.get<Nat>(tokenList, index)) {
-                    case (?tokenId) {
-                        tokenId
-                    };
-                    case (_) {
-                        throw Error.reject("index don't exist in Owned List")
-                    };
-                }
+        switch (users.get(owner)) {
+            case (?userInfo) {
+                return TrieSet.toArray(userInfo.tokens)[index];
             };
-            case (_) {
-                throw Error.reject("owner don't have the token list")
+            case _ {
+                throw Error.reject("owner don't have the token index")
             };
         };
-        return temp;
     };
 
     public query func totalSupply() : async Nat {
@@ -383,33 +418,34 @@ shared(msg) actor class NFToken(
     };
 
     public query func tokenByIndex(index: Nat) : async Nat {
-        assert(index < List.size<Nat>(allTokens));
-        let temp = switch (List.get<Nat>(allTokens, index)) {
-            case (?tokenId) {
-                tokenId
-            };
-            case (_) {
-                throw Error.reject("index don't exist in allTokens")
-            };
-        };
-        return temp;
+        assert(index < tokens.size());
+        let tokenIds = Iter.toArray(Iter.map(tokens.entries(), func (i: (Nat, TokenInfo)): Nat {i.0}));
+        return tokenIds[index];
     };
 
     public query func getAllTokens() : async [Nat] {
-        let tokens = List.toArray<Nat>(allTokens);
-        return tokens;
+        Iter.toArray(Iter.map(tokens.entries(), func (i: (Nat, TokenInfo)): Nat {i.0}))
     };
 
     public query func getTokenList(owner: Principal) : async [Nat] {
-        let tokenList = switch (ownedTokens.get(owner)) {
-            case (?list) {
-                list;
+        switch (users.get(owner)) {
+            case (?user) {
+                return TrieSet.toArray(user.tokens);
             };
-            case (_) {
+            case _ {
                 throw Error.reject("can't get the principal's ownedTokens");
             };
         };
-        let tokens = List.toArray<Nat>(tokenList);
-        return tokens;
     };
+
+    public query func getUser(who: Principal) : async UserInfoExt {
+        switch (users.get(who)) {
+            case (?user) {
+                return _userInfotoExt(user)
+            };
+            case _ {
+                throw Error.reject("can't get the principal's ownedTokens");
+            };
+        };        
+    }
 };
