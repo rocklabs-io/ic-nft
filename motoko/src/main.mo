@@ -28,8 +28,8 @@ shared(msg) actor class NFToken(
         var url: Text;
         var name: Text;
         var desc: Text;
-        timestamp: Time.Time;
         var approval: ?Principal;
+        timestamp: Time.Time;
     };
 
     type TokenInfoExt = {
@@ -38,15 +38,15 @@ shared(msg) actor class NFToken(
         url: Text;
         name: Text;
         desc: Text;
-        timestamp: Time.Time;
         approval: ?Principal;
+        timestamp: Time.Time;
     };
 
     type UserInfo = {
-        var allows: TrieSet.Set<Principal>;         // owner 允许这些人代替他操作，用于权限检查
-        var allowedBy: TrieSet.Set<Principal>;      // owner 可以操作的账号，仅用于快速查询
-        var allowedIds: TrieSet.Set<Nat>;           // owner 可以操作的 id，仅用于快速查询
-        var tokens: TrieSet.Set<Nat>;               // owner 拥有的 id, 仅用于快速查询
+        var allows: TrieSet.Set<Principal>;         // principals allowed to operate on owner's behalf
+        var allowedBy: TrieSet.Set<Principal>;      // principals approved owner
+        var allowedIds: TrieSet.Set<Nat>;           // tokens controlled by owner
+        var tokens: TrieSet.Set<Nat>;               // owner's tokens
     };
 
     type UserInfoExt = {
@@ -271,7 +271,7 @@ shared(msg) actor class NFToken(
                 own;
             };
             case (_) {
-                throw Error.reject("token does not exist")
+                throw Error.reject("token not exist")
             }
         };
         assert(Principal.equal(msg.caller, owner) or _isApprovedForAll(owner, msg.caller));
@@ -354,11 +354,11 @@ shared(msg) actor class NFToken(
 
     public query func getTokenInfo(tokenId: Nat) : async TokenInfoExt {
         switch(tokens.get(tokenId)){
-            case(?tokeninfo){
+            case(?tokeninfo) {
                 return _tokenInfotoExt(tokeninfo);
             };
-            case(_){
-                throw Error.reject("ERC721Metadata: info query for nonexistent token");
+            case(_) {
+                throw Error.reject("token not exist");
             };
         };
     };
@@ -369,7 +369,7 @@ shared(msg) actor class NFToken(
                 return owner;
             };
             case _ {
-                throw Error.reject("token does not exist, can't get owner")
+                throw Error.reject("token not exist")
             };
         }
     };
@@ -388,10 +388,10 @@ shared(msg) actor class NFToken(
                     case (_) {
                         return Principal.fromText("aaaaa-aa");
                     };
-                }                
+                }   
             };
             case (_) {
-                throw Error.reject("token don't exists")
+                throw Error.reject("token not exist")
             };
         }
     };
@@ -408,7 +408,7 @@ shared(msg) actor class NFToken(
                 return TrieSet.toArray(userInfo.tokens)[index];
             };
             case _ {
-                throw Error.reject("owner don't have the token index")
+                throw Error.reject("unauthorized")
             };
         };
     };
@@ -433,7 +433,7 @@ shared(msg) actor class NFToken(
                 return TrieSet.toArray(user.tokens);
             };
             case _ {
-                throw Error.reject("can't get the principal's ownedTokens");
+                throw Error.reject("unauthorized");
             };
         };
     };
@@ -444,7 +444,7 @@ shared(msg) actor class NFToken(
                 return _userInfotoExt(user)
             };
             case _ {
-                throw Error.reject("can't get the principal's ownedTokens");
+                throw Error.reject("unauthorized");
             };
         };        
     }
