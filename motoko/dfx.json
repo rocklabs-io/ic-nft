@@ -1,6 +1,6 @@
 {
   "canisters": {
-    "nft": {
+    "token_ERC721": {
       "main": "src/main.mo",
       "type": "motoko"
     }
