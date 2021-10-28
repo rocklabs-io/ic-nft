@@ -14,19 +14,30 @@ import Array "mo:base/Array";
 import Debug "mo:base/Debug";
 import Prelude "mo:base/Prelude";
 
-
-
 shared(msg) actor class NFToken(
     _name: Text, 
     _symbol: Text, 
     _owner: Principal
     ) = this {
 
+	type TxRecord = {
+		index: Nat;
+		tokenIndex: Nat;
+		from: Nat;
+		to: Nat;
+		timestamp: Int;
+	};
+
+	// e.g. IPFS => ipfshash; URL => https://xxx; ...
+	type KV = {
+		key: Text;
+		value: Text;
+	};
+	type Metadata = [KV];
     type TokenInfo = {
         index: Nat;
         var owner: Principal;
-        var url: Text;
-        var name: Text;
+		var metadata: Metadata;
         var desc: Text;
         var approval: ?Principal;
         timestamp: Time.Time;
@@ -36,7 +47,6 @@ shared(msg) actor class NFToken(
         index: Nat;
         owner: Principal;
         url: Text;
-        name: Text;
         desc: Text;
         approval: ?Principal;
         timestamp: Time.Time;
@@ -448,4 +458,24 @@ shared(msg) actor class NFToken(
             };
         };        
     }
+
+	public query func historySize(): async Nat {
+
+	};
+
+	public query func getTransactions(start: Nat, limit: Nat): async [TxRecord] {
+
+	};
+
+	public query func getTransaction(index: Nat): async TxRecord {
+
+	};
+
+	public query func getUserTransactionAmount(user: Principal): async Nat {
+
+	};
+
+	public query func getUserTransactions(user: Principal): async Nat {
+
+	};
 };
