@@ -320,7 +320,7 @@ shared(msg) actor class NFToken(
     public shared(msg) func mint(to: Principal, url: Text, name: Text, desc: Text): async Nat{
         assert(mintable_);
         let tokenId = _mint(to, url, name, desc);
-        addRecord(msg.caller, #mint, tokenId, blackhole, to, Time.now());
+        addRecord(msg.caller, #mint, ?tokenId, blackhole, to, Time.now());
         return tokenId;   
     };
 
@@ -336,7 +336,7 @@ shared(msg) actor class NFToken(
         };
         if msg.caller == owner {
             _mint(msg.caller, tokenId);
-            addRecord(msg.caller, #burn, tokenId, msg.caller, blackhole, Time.now());
+            addRecord(msg.caller, #burn, ?tokenId, msg.caller, blackhole, Time.now());
         }
     };
 
@@ -542,22 +542,39 @@ shared(msg) actor class NFToken(
     };
 
 	public query func historySize(): async Nat {
-
+        return ops.size();
 	};
 
-	public query func getTransactions(start: Nat, limit: Nat): async [TxRecord] {
-
+	public query func getTransactions(start: Nat, num: Nat): async [OpRecord] {
+        var res: [OpRecord] = [];
+        var i = start;
+        while(i < start + num and ops.size()) {
+            res := Array.append(res, [ops[i]]);
+            i += 1;
+        };
+        return res;
 	};
 
-	public query func getTransaction(index: Nat): async TxRecord {
-
+	public query func getTransaction(index: Nat): async OpRecord {
+        return ops[index];
 	};
 
 	public query func getUserTransactionAmount(user: Principal): async Nat {
-
+        var res: Nat = 0;
+        for (i in ops.vals()) {
+            if (i.caller == user or i.from == user or i.to == user) {
+                res += 1;
+            };
+        };
 	};
 
-	public query func getUserTransactions(user: Principal): async [TxRecord] {
-
+	public query func getUserTransactions(user: Principal): async [OpRecord] {
+        var res: [OpRecord] = [];
+        for ( i in ops.vals()) {
+            if (i.caller == user or i.from == user or i.to == user) {
+                res := Array.append<OpRecord>(res, [i]);
+            };
+        };
+        return res;
 	};
 };
