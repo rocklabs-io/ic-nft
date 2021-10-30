@@ -33,46 +33,10 @@ shared(msg) actor class NFToken(
 
     type OpRecord = Types.OpRecord;
     type Operation = Types.Operation;
-
-	// e.g. IPFS => ipfshash; URL => https://xxx; ...
-	type KV = {
-		key: Text;
-		value: Text;
-	};
-
-	type Metadata = [KV];
-
-    type TokenInfo = {
-        index: Nat;
-        var owner: Principal;
-		var metadata: Metadata;
-        var desc: Text;
-        var approval: ?Principal;
-        timestamp: Time.Time;
-    };
-
-    type TokenInfoExt = {
-        index: Nat;
-        owner: Principal;
-        url: Text;
-        desc: Text;
-        approval: ?Principal;
-        timestamp: Time.Time;
-    };
-
-    type UserInfo = {
-        var allows: TrieSet.Set<Principal>;         // principals allowed to operate on owner's behalf
-        var allowedBy: TrieSet.Set<Principal>;      // principals approved owner
-        var allowedIds: TrieSet.Set<Nat>;           // tokens controlled by owner
-        var tokens: TrieSet.Set<Nat>;               // owner's tokens
-    };
-
-    type UserInfoExt = {
-        allows: [Principal];
-        allowedBy: [Principal];
-        allowedIds: [Nat];
-        tokens: [Nat];
-    };
+    type TokenInfo = Types.TokenInfo;
+    type TokenInfoExt = Types.TokenInfoExt;
+    type UserInfo = Types.UserInfo;
+    type UserInfoExt = Types.UserInfoExt;
 
     private stable var name_ : Text = _name;
     private stable var symbol_ : Text = _symbol;
@@ -81,7 +45,8 @@ shared(msg) actor class NFToken(
     private stable var blackhole: Principal = Principal.fromText("aaaaa-aa");
     private stable var mintable_ : Bool = _mintable;
     private stable var burnable_ : Bool = _burnable;
-
+    private stable var tokensEntries : [(Nat, TokenInfo)] = [];
+    private stable var usersEntries : [(Principal, UserInfo)] = [];
     private var tokens = HashMap.HashMap<Nat, TokenInfo>(1, Nat.equal, Hash.hash);
     private var users = HashMap.HashMap<Principal, UserInfo>(1, Principal.equal, Principal.hash);
     private stable var ops: [OpRecord] = [];
@@ -398,7 +363,6 @@ shared(msg) actor class NFToken(
             };
             user.allowedBy := TrieSet.put(user.allowedBy, msg.caller, Principal.hash(msg.caller), Principal.equal);
             users.put(operator, user);
-            // 添加类型 approveAll 并添加事件
             addRecord(msg.caller, #approveAll, null, msg.caller, spender, Time.now());
         } else {
             switch (users.get(msg.caller)) {
@@ -577,4 +541,19 @@ shared(msg) actor class NFToken(
         };
         return res;
 	};
+};
+
+system func preupgrade() {
+    usersEntries := Iter.toArray(users.entries());
+    tokensEntries := = Iter.toArray(tokens.entries());
+};
+
+system func postgrade() {
+    type TokenInfo = Types.TokenInfo;
+    type UserInfo = Types.UserInfo;
+
+    users := HashMap.fromIter<Principal, UserInfo>(usersEntries.vals(), 1, Principal.equal, Principal.hash);
+    tokens := HashMap.fromIter<Nat, TokenInfo>(tokensEntries.vals(), 1, Nat.equal, Hash.hash);
+    users := [];
+    tokens := [];
 };
