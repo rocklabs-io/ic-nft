@@ -27,9 +27,7 @@ shared(msg) actor class NFToken(
     _name: Text, 
     _symbol: Text,
     _owner: Principal,
-    _desc: Text,
-    _mintable: Bool, 
-    _burnable: Bool
+    _desc: Text
     ) = this {
 
     type Metadata = Types.Metadata;
@@ -271,39 +269,10 @@ shared(msg) actor class NFToken(
         return true;
     };
 
-    public shared(msg) func setMintable(v: Bool): async Bool {
-        assert(msg.caller == owner_);
-        mintable_ := v;
-        return true;
-    };
-
-    public shared(msg) func setBurnable(v: Bool): async Bool {
-        assert(msg.caller == owner_);
-        burnable_ := v;
-        return true;
-    };
-
-    public shared(msg) func mint(to: Principal, tokenMetadata: TokenMetadata, name: Text, desc: Text): async Nat{
-        assert(mintable_);
-        let tokenId = _mint(to, tokenMetadata, name, desc);
+    public shared(msg) func mint(to: Principal, tokenMetadata: TokenMetadata): async Nat{
+        let tokenId = _mint(to, tokenMetadata);
         let txid = addRecord(msg.caller, #mint, ?tokenId, blackhole, to, Time.now());
         return tokenId;   
-    };
-
-    public shared(msg) func burn(tokenId: Nat) {
-        assert(burnable_);
-        var owner: Principal = switch (_ownerOf(tokenId)) {
-            case (?own) {
-                own;
-            };
-            case (_) {
-                throw Error.reject("token not exist")
-            }
-        };
-        if (msg.caller == owner) {
-            _burn(msg.caller, tokenId);
-            let txid = addRecord(msg.caller, #burn, ?tokenId, msg.caller, blackhole, Time.now());
-        }
     };
 
     public shared(msg) func approve(spender: Principal, tokenId: Nat) : async Bool {

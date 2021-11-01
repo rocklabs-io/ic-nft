@@ -10,7 +10,6 @@ import Time "mo:base/Time";
 import TrieSet "mo:base/TrieSet";
 
 module {
-    // e.g. IPFS => ipfshash; URL => https://xxx; ...
     public type Metadata = {
         name: Text;
         desc: Text;
@@ -18,6 +17,7 @@ module {
         owner: Principal;
     };
 
+    // e.g. IPFS => ipfshash; URL => https://xxx; ...
     public type KV = {
         key: Text;
         value: Text;
@@ -28,9 +28,7 @@ module {
     public type TokenInfo = {
         index: Nat;
         var owner: Principal;
-        var name: Text;
-        var tokenMetadata: TokenMetadata;
-        var desc: Text;
+        var metadata: TokenMetadata;
         var approval: ?Principal;
         timestamp: Time.Time;
     };
@@ -38,9 +36,7 @@ module {
     public type TokenInfoExt = {
         index: Nat;
         owner: Principal;
-        tokenMetadata: TokenMetadata;
-        name: Text;
-        desc: Text;
+        metadata: TokenMetadata;
         approval: ?Principal;
         timestamp: Time.Time;
     };
