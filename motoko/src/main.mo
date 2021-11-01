@@ -525,11 +525,11 @@ shared(msg) actor class NFToken(
         return ops;
     };
 
-	public query func historySize(): async Nat {
+    public query func historySize(): async Nat {
         return ops.size();
-	};
+    };
 
-	public query func getTransactions(start: Nat, num: Nat): async [OpRecord] {
+    public query func getTransactions(start: Nat, num: Nat): async [OpRecord] {
         var res: [OpRecord] = [];
         var i = start;
         while (i < start + num and i < ops.size()) {
@@ -537,13 +537,13 @@ shared(msg) actor class NFToken(
             i += 1;
         };
         return res;
-	};
+    };
 
-	public query func getTransaction(index: Nat): async OpRecord {
+    public query func getTransaction(index: Nat): async OpRecord {
         return ops[index];
-	};
+    };
 
-	public query func getUserTransactionAmount(user: Principal): async Nat {
+    public query func getUserTransactionAmount(user: Principal): async Nat {
         var res: Nat = 0;
         for (i in ops.vals()) {
             if (i.caller == user or i.from == user or i.to == user) {
@@ -551,9 +551,9 @@ shared(msg) actor class NFToken(
             };
         };
         return res;
-	};
+    };
 
-	public query func getUserTransactions(user: Principal): async [OpRecord] {
+    public query func getUserTransactions(user: Principal): async [OpRecord] {
         var res: [OpRecord] = [];
         for (i in ops.vals()) {
             if (i.caller == user or i.from == user or i.to == user) {
@@ -561,7 +561,7 @@ shared(msg) actor class NFToken(
             };
         };
         return res;
-	};
+    };
 
     system func preupgrade() {
         usersEntries := Iter.toArray(users.entries());

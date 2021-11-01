@@ -18,18 +18,18 @@ module {
         owner: Principal;
     };
 
-	public type KV = {
-		key: Text;
-		value: Text;
-	};
+    public type KV = {
+        key: Text;
+        value: Text;
+    };
 
-	public type TokenMetadata = [KV];
+    public type TokenMetadata = [KV];
 
     public type TokenInfo = {
         index: Nat;
         var owner: Principal;
         var name: Text;
-		var tokenMetadata: TokenMetadata;
+        var tokenMetadata: TokenMetadata;
         var desc: Text;
         var approval: ?Principal;
         timestamp: Time.Time;
@@ -72,9 +72,9 @@ module {
         caller: Principal;
         op: Operation;
         index: Nat;
-		tokenIndex: ?Nat;
-		from: Principal;
-		to: Principal;
-		timestamp: Time.Time;
+        tokenIndex: ?Nat;
+        from: Principal;
+        to: Principal;
+        timestamp: Time.Time;
     };
 };
