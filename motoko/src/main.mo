@@ -17,6 +17,7 @@ import Prelude "mo:base/Prelude";
 shared(msg) actor class NFToken(
     _name: Text, 
     _symbol: Text, 
+    _desc: Text,
     _owner: Principal
     ) = this {
 
@@ -28,17 +29,23 @@ shared(msg) actor class NFToken(
 		timestamp: Int;
 	};
 
+    type Metadata = {
+        name: Text;
+        desc: Text;
+        totalSupply: Nat;
+        owner: Principal;
+    };
+
 	// e.g. IPFS => ipfshash; URL => https://xxx; ...
 	type KV = {
 		key: Text;
 		value: Text;
 	};
-	type Metadata = [KV];
+	type TokenMetadata = [KV];
     type TokenInfo = {
         index: Nat;
         var owner: Principal;
-		var metadata: Metadata;
-        var desc: Text;
+		var metadata: TokenMetadata;
         var approval: ?Principal;
         timestamp: Time.Time;
     };
@@ -46,8 +53,7 @@ shared(msg) actor class NFToken(
     type TokenInfoExt = {
         index: Nat;
         owner: Principal;
-        url: Text;
-        desc: Text;
+        metadata: TokenMetadata;
         approval: ?Principal;
         timestamp: Time.Time;
     };
@@ -68,10 +74,14 @@ shared(msg) actor class NFToken(
 
     private stable var name_ : Text = _name;
     private stable var symbol_ : Text = _symbol;
+    private stable var desc_ : Text = _desc;
     private stable var owner_: Principal = _owner;
     private stable var totalSupply_: Nat = 0;
     private stable var blackhole: Principal = Principal.fromText("aaaaa-aa");
 
+    private stable var txIndex: Nat = 0;
+    private stable var txs: [TxRecord] = [];
+    private stable var userTxs = HashMap.HashMap<Principal, [Nat]>(1, Principal.equal, Principal.hash);
     private var tokens = HashMap.HashMap<Nat, TokenInfo>(1, Nat.equal, Hash.hash);
     private var users = HashMap.HashMap<Principal, UserInfo>(1, Principal.equal, Principal.hash);
 
@@ -109,7 +119,6 @@ shared(msg) actor class NFToken(
         }
     };
     
-
     private func _balanceOf(who: Principal) : Nat {
         switch (users.get(who)) {
             case (?user) { return TrieSet.size(user.tokens); };
@@ -130,9 +139,7 @@ shared(msg) actor class NFToken(
         return {
             index = info.index;
             owner = info.owner;
-            url = info.url;
-            name = info.name;
-            desc = info.desc;
+            metadata = info.metadata;
             timestamp = info.timestamp;
             approval = info.approval;
         };
@@ -244,13 +251,11 @@ shared(msg) actor class NFToken(
         _transfer(blackhole, tokenId);
     };
 
-    private func _mint(to: Principal, url: Text, name: Text, desc: Text) {
+    private func _mint(to: Principal, metadata: TokenMetadata) {
         let token: TokenInfo = {
             index = totalSupply_;
             var owner = to;
-            var url = url;
-            var name = name;
-            var desc = desc;
+            var metadata = metadata;
             timestamp = Time.now();
             var approval = null;
         };
@@ -262,9 +267,7 @@ shared(msg) actor class NFToken(
     private func _updateTokenInfo(info: TokenInfoExt) {
         assert(_exists(info.index));
         let token = _unwrap(tokens.get(info.index));
-        token.url := info.url;
-        token.name := info.name;
-        token.desc := info.desc;
+        token.metadata := info.metadata;
         tokens.put(info.index, token);
     };
 
@@ -457,10 +460,19 @@ shared(msg) actor class NFToken(
                 throw Error.reject("unauthorized");
             };
         };        
-    }
+    };
+
+    public query func getMetadata(): async Metadata {
+        {
+            name = name_;
+            desc = desc_;
+            totalSupply = totalSupply_;
+            owner = owner_;
+        }
+    };
 
 	public query func historySize(): async Nat {
-
+        return txIndex;
 	};
 
 	public query func getTransactions(start: Nat, limit: Nat): async [TxRecord] {
