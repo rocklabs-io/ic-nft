@@ -1,5 +1,14 @@
+/**
+ * Module     : main.mo
+ * Copyright  : 2021 DFinance Team
+ * License    : Apache 2.0 with LLVM Exception
+ * Maintainer : DFinance Team <hello@dfinance.ai>
+ * Stability  : Experimental
+ */
+
 import HashMap "mo:base/HashMap";
 import Principal "mo:base/Principal";
+import Types "./types";
 import Error "mo:base/Error";
 import Option "mo:base/Option";
 import Nat "mo:base/Nat";
@@ -16,61 +25,22 @@ import Prelude "mo:base/Prelude";
 
 shared(msg) actor class NFToken(
     _name: Text, 
-    _symbol: Text, 
+    _symbol: Text,
+    _owner: Principal,
     _desc: Text,
-    _owner: Principal
+    _mintable: Bool, 
+    _burnable: Bool
     ) = this {
 
-	type TxRecord = {
-		index: Nat;
-		tokenIndex: Nat;
-		from: Nat;
-		to: Nat;
-		timestamp: Int;
-	};
-
-    type Metadata = {
-        name: Text;
-        desc: Text;
-        totalSupply: Nat;
-        owner: Principal;
-    };
-
-	// e.g. IPFS => ipfshash; URL => https://xxx; ...
-	type KV = {
-		key: Text;
-		value: Text;
-	};
-	type TokenMetadata = [KV];
-    type TokenInfo = {
-        index: Nat;
-        var owner: Principal;
-		var metadata: TokenMetadata;
-        var approval: ?Principal;
-        timestamp: Time.Time;
-    };
-
-    type TokenInfoExt = {
-        index: Nat;
-        owner: Principal;
-        metadata: TokenMetadata;
-        approval: ?Principal;
-        timestamp: Time.Time;
-    };
-
-    type UserInfo = {
-        var allows: TrieSet.Set<Principal>;         // principals allowed to operate on owner's behalf
-        var allowedBy: TrieSet.Set<Principal>;      // principals approved owner
-        var allowedIds: TrieSet.Set<Nat>;           // tokens controlled by owner
-        var tokens: TrieSet.Set<Nat>;               // owner's tokens
-    };
-
-    type UserInfoExt = {
-        allows: [Principal];
-        allowedBy: [Principal];
-        allowedIds: [Nat];
-        tokens: [Nat];
-    };
+    type Metadata = Types.Metadata;
+    type TokenMetadata = Types.TokenMetadata;
+    type KV = Types.KV;
+    type OpRecord = Types.OpRecord;
+    type Operation = Types.Operation;
+    type TokenInfo = Types.TokenInfo;
+    type TokenInfoExt = Types.TokenInfoExt;
+    type UserInfo = Types.UserInfo;
+    type UserInfoExt = Types.UserInfoExt;
 
     private stable var name_ : Text = _name;
     private stable var symbol_ : Text = _symbol;
@@ -79,11 +49,33 @@ shared(msg) actor class NFToken(
     private stable var totalSupply_: Nat = 0;
     private stable var blackhole: Principal = Principal.fromText("aaaaa-aa");
 
-    private stable var txIndex: Nat = 0;
-    private stable var txs: [TxRecord] = [];
-    private stable var userTxs = HashMap.HashMap<Principal, [Nat]>(1, Principal.equal, Principal.hash);
+    private stable var mintable_ : Bool = _mintable;
+    private stable var burnable_ : Bool = _burnable;
+    private stable var tokensEntries : [(Nat, TokenInfo)] = [];
+    private stable var usersEntries : [(Principal, UserInfo)] = [];
     private var tokens = HashMap.HashMap<Nat, TokenInfo>(1, Nat.equal, Hash.hash);
     private var users = HashMap.HashMap<Principal, UserInfo>(1, Principal.equal, Principal.hash);
+    private stable var ops: [OpRecord] = [];
+    private stable var txIndex: Nat = 0;
+    private stable var userTxs = HashMap.HashMap<Principal, [Nat]>(1, Principal.equal, Principal.hash);
+
+    private func addRecord(
+        caller: Principal, op: Operation, tokenIndex: ?Nat,
+        from: Principal, to: Principal, timestamp: Time.Time
+    ): Nat {
+        let index = ops.size();
+        let record: OpRecord = {
+            caller = caller;
+            op = op;
+            index = index;
+            tokenIndex = tokenIndex;
+            from = from;
+            to = to;
+            timestamp = timestamp;
+        };
+        ops := Array.append(ops, [record]);
+        return index;
+    };
 
     private func _unwrap<T>(x : ?T) : T =
     switch x {
@@ -211,7 +203,7 @@ shared(msg) actor class NFToken(
             };
         }
     };
-
+   
     private func _clearApproval(owner: Principal, tokenId: Nat) {
         assert(_exists(tokenId) and _isOwner(owner, tokenId));
         switch (tokens.get(tokenId)) {
@@ -262,6 +254,7 @@ shared(msg) actor class NFToken(
         tokens.put(totalSupply_, token);
         _addTokenTo(to, totalSupply_);
         totalSupply_ += 1;
+        return token.index;
     };
 
     private func _updateTokenInfo(info: TokenInfoExt) {
@@ -276,7 +269,42 @@ shared(msg) actor class NFToken(
         _clearApproval(from, tokenId);
         _transfer(to, tokenId);
         return true;
-    };    
+    };
+
+    public shared(msg) func setMintable(v: Bool): async Bool {
+        assert(msg.caller == owner_);
+        mintable_ := v;
+        return true;
+    };
+
+    public shared(msg) func setBurnable(v: Bool): async Bool {
+        assert(msg.caller == owner_);
+        burnable_ := v;
+        return true;
+    };
+
+    public shared(msg) func mint(to: Principal, tokenMetadata: TokenMetadata, name: Text, desc: Text): async Nat{
+        assert(mintable_);
+        let tokenId = _mint(to, tokenMetadata, name, desc);
+        let txid = addRecord(msg.caller, #mint, ?tokenId, blackhole, to, Time.now());
+        return tokenId;   
+    };
+
+    public shared(msg) func burn(tokenId: Nat) {
+        assert(burnable_);
+        var owner: Principal = switch (_ownerOf(tokenId)) {
+            case (?own) {
+                own;
+            };
+            case (_) {
+                throw Error.reject("token not exist")
+            }
+        };
+        if (msg.caller == owner) {
+            _burn(msg.caller, tokenId);
+            let txid = addRecord(msg.caller, #burn, ?tokenId, msg.caller, blackhole, Time.now());
+        }
+    };
 
     public shared(msg) func approve(spender: Principal, tokenId: Nat) : async Bool {
         var owner: Principal = switch (_ownerOf(tokenId)) {
@@ -289,6 +317,14 @@ shared(msg) actor class NFToken(
         };
         assert(Principal.equal(msg.caller, owner) or _isApprovedForAll(owner, msg.caller));
         assert(owner != spender);
+        var from: Principal = switch (_getApproved(tokenId)) {
+            case (?f) {
+                f;
+            };
+            case (_) {
+                owner;
+            }
+        }; 
         switch (tokens.get(tokenId)) {
             case (?info) {
                 info.approval := ?spender;
@@ -309,6 +345,7 @@ shared(msg) actor class NFToken(
                 users.put(spender, user);
             };
         };
+        let txid = addRecord(msg.caller, #approve, ?tokenId, from, spender, Time.now());
         return true;
     };
 
@@ -327,6 +364,7 @@ shared(msg) actor class NFToken(
             };
             user.allowedBy := TrieSet.put(user.allowedBy, msg.caller, Principal.hash(msg.caller), Principal.equal);
             users.put(operator, user);
+            let txid = addRecord(msg.caller, #approveAll, null, msg.caller, operator, Time.now());
         } else {
             switch (users.get(msg.caller)) {
                 case (?user) {
@@ -343,10 +381,12 @@ shared(msg) actor class NFToken(
                 case _ { };
             };
         };
+        let txid = addRecord(msg.caller, #unapproveAll, null, msg.caller, operator, Time.now());
         return true;
     };
 
     public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
+        let txid = addRecord(msg.caller, #transfer, ?tokenId, from, to, Time.now());
         return  _transferFrom(msg.caller, from, to, tokenId);
     };
 
@@ -357,6 +397,16 @@ shared(msg) actor class NFToken(
     };
 
     // public query function 
+
+    public query func getMetadata(): async Metadata {
+        {
+            name = name_;
+            desc = desc_;
+            totalSupply = totalSupply_;
+            owner = owner_;
+        }
+    };
+    
     public query func name() : async Text {
         return name_;
     };
@@ -471,23 +521,61 @@ shared(msg) actor class NFToken(
         }
     };
 
+    public query func getAllTxs(): async [OpRecord] {
+        return ops;
+    };
+
 	public query func historySize(): async Nat {
-        return txIndex;
+        return ops.size();
 	};
 
-	public query func getTransactions(start: Nat, limit: Nat): async [TxRecord] {
-
+	public query func getTransactions(start: Nat, num: Nat): async [OpRecord] {
+        var res: [OpRecord] = [];
+        var i = start;
+        while (i < start + num and i < ops.size()) {
+            res := Array.append(res, [ops[i]]);
+            i += 1;
+        };
+        return res;
 	};
 
-	public query func getTransaction(index: Nat): async TxRecord {
-
+	public query func getTransaction(index: Nat): async OpRecord {
+        return ops[index];
 	};
 
 	public query func getUserTransactionAmount(user: Principal): async Nat {
-
+        var res: Nat = 0;
+        for (i in ops.vals()) {
+            if (i.caller == user or i.from == user or i.to == user) {
+                res += 1;
+            };
+        };
+        return res;
 	};
 
-	public query func getUserTransactions(user: Principal): async Nat {
-
+	public query func getUserTransactions(user: Principal): async [OpRecord] {
+        var res: [OpRecord] = [];
+        for (i in ops.vals()) {
+            if (i.caller == user or i.from == user or i.to == user) {
+                res := Array.append<OpRecord>(res, [i]);
+            };
+        };
+        return res;
 	};
+
+    system func preupgrade() {
+        usersEntries := Iter.toArray(users.entries());
+        tokensEntries := Iter.toArray(tokens.entries());
+    };
+
+    system func postupgrade() {
+        type TokenInfo = Types.TokenInfo;
+        type UserInfo = Types.UserInfo;
+
+        users := HashMap.fromIter<Principal, UserInfo>(usersEntries.vals(), 1, Principal.equal, Principal.hash);
+        tokens := HashMap.fromIter<Nat, TokenInfo>(tokensEntries.vals(), 1, Nat.equal, Hash.hash);
+        usersEntries := [];
+        tokensEntries := [];
+    };
 };
+
