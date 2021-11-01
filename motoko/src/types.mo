@@ -7,42 +7,52 @@
  */
 
 import Time "mo:base/Time";
+import TrieSet "mo:base/TrieSet";
 
 module {
     // e.g. IPFS => ipfshash; URL => https://xxx; ...
-	type KV = {
+    public type Metadata = {
+        name: Text;
+        desc: Text;
+        totalSupply: Nat;
+        owner: Principal;
+    };
+
+	public type KV = {
 		key: Text;
 		value: Text;
 	};
 
-	type Metadata = [KV];
+	public type TokenMetadata = [KV];
 
-    type TokenInfo = {
+    public type TokenInfo = {
         index: Nat;
         var owner: Principal;
-		var metadata: Metadata;
+        var name: Text;
+		var tokenMetadata: TokenMetadata;
         var desc: Text;
         var approval: ?Principal;
         timestamp: Time.Time;
     };
 
-    type TokenInfoExt = {
+    public type TokenInfoExt = {
         index: Nat;
         owner: Principal;
-        url: Text;
+        tokenMetadata: TokenMetadata;
+        name: Text;
         desc: Text;
         approval: ?Principal;
         timestamp: Time.Time;
     };
 
-    type UserInfo = {
+    public type UserInfo = {
         var allows: TrieSet.Set<Principal>;         // principals allowed to operate on owner's behalf
         var allowedBy: TrieSet.Set<Principal>;      // principals approved owner
         var allowedIds: TrieSet.Set<Nat>;           // tokens controlled by owner
         var tokens: TrieSet.Set<Nat>;               // owner's tokens
     };
 
-    type UserInfoExt = {
+    public type UserInfoExt = {
         allows: [Principal];
         allowedBy: [Principal];
         allowedIds: [Nat];

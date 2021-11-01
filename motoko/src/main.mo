@@ -27,10 +27,14 @@ shared(msg) actor class NFToken(
     _name: Text, 
     _symbol: Text, 
     _owner: Principal,
+    _desc: Text,
     _mintable: Bool, 
     _burnable: Bool
     ) = this {
 
+    type Metadata = Types.Metadata;
+    type TokenMetadata = Types.TokenMetadata;
+    type KV = Types.KV;
     type OpRecord = Types.OpRecord;
     type Operation = Types.Operation;
     type TokenInfo = Types.TokenInfo;
@@ -40,6 +44,7 @@ shared(msg) actor class NFToken(
 
     private stable var name_ : Text = _name;
     private stable var symbol_ : Text = _symbol;
+    private stable var desc_ : Text = _desc;
     private stable var owner_: Principal = _owner;
     private stable var totalSupply_: Nat = 0;
     private stable var blackhole: Principal = Principal.fromText("aaaaa-aa");
@@ -65,7 +70,7 @@ shared(msg) actor class NFToken(
             to = to;
             timestamp = timestamp;
         };
-        records := Array.append(ops, [record]);
+        ops := Array.append(ops, [record]);
         return index;
     };
 
@@ -124,7 +129,7 @@ shared(msg) actor class NFToken(
         return {
             index = info.index;
             owner = info.owner;
-            url = info.url;
+            tokenMetadata = info.tokenMetadata;
             name = info.name;
             desc = info.desc;
             timestamp = info.timestamp;
@@ -198,7 +203,7 @@ shared(msg) actor class NFToken(
             };
         }
     };
-
+   
     private func _clearApproval(owner: Principal, tokenId: Nat) {
         assert(_exists(tokenId) and _isOwner(owner, tokenId));
         switch (tokens.get(tokenId)) {
@@ -238,11 +243,11 @@ shared(msg) actor class NFToken(
         _transfer(blackhole, tokenId);
     };
 
-    private func _mint(to: Principal, url: Text, name: Text, desc: Text): Nat {
+    private func _mint(to: Principal, tokenMetadata: TokenMetadata, name: Text, desc: Text): Nat {
         let token: TokenInfo = {
             index = totalSupply_;
             var owner = to;
-            var url = url;
+            var tokenMetadata = tokenMetadata;
             var name = name;
             var desc = desc;
             timestamp = Time.now();
@@ -257,7 +262,7 @@ shared(msg) actor class NFToken(
     private func _updateTokenInfo(info: TokenInfoExt) {
         assert(_exists(info.index));
         let token = _unwrap(tokens.get(info.index));
-        token.url := info.url;
+        token.tokenMetadata := info.tokenMetadata;
         token.name := info.name;
         token.desc := info.desc;
         tokens.put(info.index, token);
@@ -282,14 +287,14 @@ shared(msg) actor class NFToken(
         return true;
     };
 
-    public shared(msg) func mint(to: Principal, url: Text, name: Text, desc: Text): async Nat{
+    public shared(msg) func mint(to: Principal, tokenMetadata: TokenMetadata, name: Text, desc: Text): async Nat{
         assert(mintable_);
-        let tokenId = _mint(to, url, name, desc);
-        addRecord(msg.caller, #mint, ?tokenId, blackhole, to, Time.now());
+        let tokenId = _mint(to, tokenMetadata, name, desc);
+        let txid = addRecord(msg.caller, #mint, ?tokenId, blackhole, to, Time.now());
         return tokenId;   
     };
 
-    public shared(msg) func burn(tokeId: Nat) {
+    public shared(msg) func burn(tokenId: Nat) {
         assert(burnable_);
         var owner: Principal = switch (_ownerOf(tokenId)) {
             case (?own) {
@@ -299,9 +304,9 @@ shared(msg) actor class NFToken(
                 throw Error.reject("token not exist")
             }
         };
-        if msg.caller == owner {
-            _mint(msg.caller, tokenId);
-            addRecord(msg.caller, #burn, ?tokenId, msg.caller, blackhole, Time.now());
+        if (msg.caller == owner) {
+            _burn(msg.caller, tokenId);
+            let txid = addRecord(msg.caller, #burn, ?tokenId, msg.caller, blackhole, Time.now());
         }
     };
 
@@ -344,7 +349,7 @@ shared(msg) actor class NFToken(
                 users.put(spender, user);
             };
         };
-        addRecord(msg.caller, #approve, ?tokenId, from, spender, Time.now());
+        let txid = addRecord(msg.caller, #approve, ?tokenId, from, spender, Time.now());
         return true;
     };
 
@@ -363,7 +368,7 @@ shared(msg) actor class NFToken(
             };
             user.allowedBy := TrieSet.put(user.allowedBy, msg.caller, Principal.hash(msg.caller), Principal.equal);
             users.put(operator, user);
-            addRecord(msg.caller, #approveAll, null, msg.caller, spender, Time.now());
+            let txid = addRecord(msg.caller, #approveAll, null, msg.caller, operator, Time.now());
         } else {
             switch (users.get(msg.caller)) {
                 case (?user) {
@@ -380,12 +385,12 @@ shared(msg) actor class NFToken(
                 case _ { };
             };
         };
-        addRecord(msg.caller, #unapproveAll, null, msg.caller, spender, Time.now());
+        let txid = addRecord(msg.caller, #unapproveAll, null, msg.caller, operator, Time.now());
         return true;
     };
 
     public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
-        addRecord(msg.caller, #transfer, ?tokenId, from, to, Time.now());
+        let txid = addRecord(msg.caller, #transfer, ?tokenId, from, to, Time.now());
         return  _transferFrom(msg.caller, from, to, tokenId);
     };
 
@@ -396,6 +401,16 @@ shared(msg) actor class NFToken(
     };
 
     // public query function 
+
+    public query func getMetadata(): async Metadata {
+        {
+            name = name_;
+            desc = desc_;
+            totalSupply = totalSupply_;
+            owner = owner_;
+        }
+    };
+    
     public query func name() : async Text {
         return name_;
     };
@@ -512,7 +527,7 @@ shared(msg) actor class NFToken(
 	public query func getTransactions(start: Nat, num: Nat): async [OpRecord] {
         var res: [OpRecord] = [];
         var i = start;
-        while(i < start + num and ops.size()) {
+        while (i < start + num and i < ops.size()) {
             res := Array.append(res, [ops[i]]);
             i += 1;
         };
@@ -530,30 +545,32 @@ shared(msg) actor class NFToken(
                 res += 1;
             };
         };
+        return res;
 	};
 
 	public query func getUserTransactions(user: Principal): async [OpRecord] {
         var res: [OpRecord] = [];
-        for ( i in ops.vals()) {
+        for (i in ops.vals()) {
             if (i.caller == user or i.from == user or i.to == user) {
                 res := Array.append<OpRecord>(res, [i]);
             };
         };
         return res;
 	};
+
+    system func preupgrade() {
+        usersEntries := Iter.toArray(users.entries());
+        tokensEntries := Iter.toArray(tokens.entries());
+    };
+
+    system func postupgrade() {
+        type TokenInfo = Types.TokenInfo;
+        type UserInfo = Types.UserInfo;
+
+        users := HashMap.fromIter<Principal, UserInfo>(usersEntries.vals(), 1, Principal.equal, Principal.hash);
+        tokens := HashMap.fromIter<Nat, TokenInfo>(tokensEntries.vals(), 1, Nat.equal, Hash.hash);
+        usersEntries := [];
+        tokensEntries := [];
+    };
 };
 
-system func preupgrade() {
-    usersEntries := Iter.toArray(users.entries());
-    tokensEntries := = Iter.toArray(tokens.entries());
-};
-
-system func postgrade() {
-    type TokenInfo = Types.TokenInfo;
-    type UserInfo = Types.UserInfo;
-
-    users := HashMap.fromIter<Principal, UserInfo>(usersEntries.vals(), 1, Principal.equal, Principal.hash);
-    tokens := HashMap.fromIter<Nat, TokenInfo>(tokensEntries.vals(), 1, Nat.equal, Hash.hash);
-    users := [];
-    tokens := [];
-};
