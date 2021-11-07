@@ -17,13 +17,26 @@ module {
         owner: Principal;
     };
 
-    // e.g. IPFS => ipfshash; URL => https://xxx; ...
-    public type KV = {
+    public type FileType = {
+        #jpg;
+        #png;
+        #mp4;
+    };
+    public type Location = {
+        #InCanister: Blob; // NFT encoded data
+        #AssetCanister: (Principal, Blob); // asset canister id, storage key
+        #IPFS: Text; // IPFS content hash
+        #Web: Text; // URL pointing to the file
+    };
+    public type Attribute = {
         key: Text;
         value: Text;
     };
-
-    public type TokenMetadata = [KV];
+    public type TokenMetadata = {
+        filetype: FileType;
+        location: Location;
+        attributes: [Attribute];
+    };
 
     public type TokenInfo = {
         index: Nat;

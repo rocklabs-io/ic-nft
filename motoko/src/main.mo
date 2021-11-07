@@ -31,8 +31,10 @@ shared(msg) actor class NFToken(
     ) = this {
 
     type Metadata = Types.Metadata;
+    type FileType = Types.FileType;
+    type Location = Types.Location;
+    type Attribute = Types.Attribute;
     type TokenMetadata = Types.TokenMetadata;
-    type KV = Types.KV;
     type OpRecord = Types.OpRecord;
     type Operation = Types.Operation;
     type TokenInfo = Types.TokenInfo;
@@ -479,15 +481,6 @@ shared(msg) actor class NFToken(
                 throw Error.reject("unauthorized");
             };
         };        
-    };
-
-    public query func getMetadata(): async Metadata {
-        {
-            name = name_;
-            desc = desc_;
-            totalSupply = totalSupply_;
-            owner = owner_;
-        }
     };
 
     public query func getAllTxs(): async [OpRecord] {
