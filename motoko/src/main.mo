@@ -344,7 +344,7 @@ shared(msg) actor class NFToken(
     };
 
     public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
-        assert(_isApprovedOrOwner(caller, tokenId));
+        assert(_isApprovedOrOwner(msg.caller, tokenId));
         _clearApproval(from, tokenId);
         _transfer(to, tokenId);
         let txid = addRecord(msg.caller, #transfer, ?tokenId, from, to, Time.now());
@@ -421,7 +421,7 @@ shared(msg) actor class NFToken(
             };
         };
         var ret: [TokenInfoExt] = [];
-        for(id in tokenIds) {
+        for(id in Iter.fromArray(tokenIds)) {
             ret := Array.append(ret, [_tokenInfotoExt(_unwrap(tokens.get(id)))]);
         };
         return ret;
@@ -429,7 +429,7 @@ shared(msg) actor class NFToken(
 
     public query func ownerOf(tokenId: Nat) : async Principal {
         switch (_ownerOf(tokenId)) {
-            case (? owner) {
+            case (?owner) {
                 return owner;
             };
             case _ {
