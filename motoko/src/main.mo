@@ -26,8 +26,8 @@ import Types "./types";
 shared(msg) actor class NFToken(
     _name: Text, 
     _symbol: Text,
-    _owner: Principal,
-    _desc: Text
+    _desc: Text,
+    _owner: Principal
     ) = this {
 
     type Metadata = Types.Metadata;
