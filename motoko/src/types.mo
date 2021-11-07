@@ -50,16 +50,16 @@ module {
     };
 
     public type UserInfo = {
-        var allows: TrieSet.Set<Principal>;     // principals allowed to operate on the user's behalf
-        var allowedBy: TrieSet.Set<Principal>;  // principals approved user
-        var allowedIds: TrieSet.Set<Nat>;       // tokens the user can operate
-        var tokens: TrieSet.Set<Nat>;           // user's tokens
+        var operators: TrieSet.Set<Principal>;     // principals allowed to operate on the user's behalf
+        var allowedBy: TrieSet.Set<Principal>;     // principals approved user to operate their's tokens
+        var allowedTokens: TrieSet.Set<Nat>;       // tokens the user can operate
+        var tokens: TrieSet.Set<Nat>;              // user's tokens
     };
 
     public type UserInfoExt = {
-        allows: [Principal];
+        operators: [Principal];
         allowedBy: [Principal];
-        allowedIds: [Nat];
+        allowedTokens: [Nat];
         tokens: [Nat];
     };
     /// Update call operations
