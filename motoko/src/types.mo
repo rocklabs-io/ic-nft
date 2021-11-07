@@ -50,10 +50,10 @@ module {
     };
 
     public type UserInfo = {
-        var allows: TrieSet.Set<Principal>;         // principals allowed to operate on owner's behalf
-        var allowedBy: TrieSet.Set<Principal>;      // principals approved owner
-        var allowedIds: TrieSet.Set<Nat>;           // tokens controlled by owner
-        var tokens: TrieSet.Set<Nat>;               // owner's tokens
+        var allows: TrieSet.Set<Principal>;     // principals allowed to operate on the user's behalf
+        var allowedBy: TrieSet.Set<Principal>;  // principals approved user
+        var allowedIds: TrieSet.Set<Nat>;       // tokens the user can operate
+        var tokens: TrieSet.Set<Nat>;           // user's tokens
     };
 
     public type UserInfoExt = {
@@ -69,7 +69,7 @@ module {
         #transfer;
         #approve;
         #approveAll;
-        #unapproveAll; 
+        #revokeAll; // revoke approvals
     };
     /// Update call operation record fields
     public type OpRecord = {

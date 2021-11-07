@@ -54,7 +54,6 @@ shared(msg) actor class NFToken(
     private var users = HashMap.HashMap<Principal, UserInfo>(1, Principal.equal, Principal.hash);
     private stable var ops: [OpRecord] = [];
     private stable var txIndex: Nat = 0;
-    private var userTxs = HashMap.HashMap<Principal, [Nat]>(1, Principal.equal, Principal.hash);
 
     private func addRecord(
         caller: Principal, op: Operation, tokenIndex: ?Nat,
@@ -101,6 +100,7 @@ shared(msg) actor class NFToken(
         };
     };
 
+    // TODO
     private func _isApprover(who: Principal, tokenId: Nat) : Bool {
         switch (tokens.get(tokenId)) {
             case (?info) { return info.approval == ?who; };
@@ -254,24 +254,21 @@ shared(msg) actor class NFToken(
         return token.index;
     };
 
-    private func _updateTokenInfo(info: TokenInfoExt) {
-        assert(_exists(info.index));
-        let token = _unwrap(tokens.get(info.index));
-        token.metadata := info.metadata;
-        tokens.put(info.index, token);
-    };
-
-    private func _transferFrom(caller: Principal, from: Principal, to: Principal, tokenId: Nat) :  Bool {
-        assert(_isApprovedOrOwner(caller, tokenId));
-        _clearApproval(from, tokenId);
-        _transfer(to, tokenId);
-        return true;
-    };
-
+    // public update calls
     public shared(msg) func mint(to: Principal, tokenMetadata: TokenMetadata): async Nat {
+        assert(msg.caller == owner_);
         let tokenId = _mint(to, tokenMetadata);
         let txid = addRecord(msg.caller, #mint, ?tokenId, blackhole, to, Time.now());
         return tokenId;
+    };
+
+    public shared(msg) func setTokenMetadata(tokenId: Nat, metadata: TokenMetadata) : async Bool {
+        assert(msg.caller == owner_); // only NFT issuer can do this
+        assert(_exists(tokenId));
+        let token = _unwrap(tokens.get(tokenId));
+        token.metadata := metadata;
+        tokens.put(tokenId, token);
+        return true;
     };
 
     public shared(msg) func approve(spender: Principal, tokenId: Nat) : async Bool {
@@ -285,14 +282,6 @@ shared(msg) actor class NFToken(
         };
         assert(Principal.equal(msg.caller, owner) or _isApprovedForAll(owner, msg.caller));
         assert(owner != spender);
-        var from: Principal = switch (_getApproved(tokenId)) {
-            case (?f) {
-                f;
-            };
-            case (_) {
-                owner;
-            }
-        }; 
         switch (tokens.get(tokenId)) {
             case (?info) {
                 info.approval := ?spender;
@@ -313,12 +302,13 @@ shared(msg) actor class NFToken(
                 users.put(spender, user);
             };
         };
-        let txid = addRecord(msg.caller, #approve, ?tokenId, from, spender, Time.now());
+        let txid = addRecord(msg.caller, #approve, ?tokenId, msg.caller, spender, Time.now());
         return true;
     };
 
     public shared(msg) func setApprovalForAll(operator: Principal, approved: Bool) : async Bool {
         assert(msg.caller != operator);
+        var txid = 0;
         if approved {
             let caller = switch (users.get(msg.caller)) {
                 case (?user) { user };
@@ -332,7 +322,7 @@ shared(msg) actor class NFToken(
             };
             user.allowedBy := TrieSet.put(user.allowedBy, msg.caller, Principal.hash(msg.caller), Principal.equal);
             users.put(operator, user);
-            let txid = addRecord(msg.caller, #approveAll, null, msg.caller, operator, Time.now());
+            txid := addRecord(msg.caller, #approveAll, null, msg.caller, operator, Time.now());
         } else {
             switch (users.get(msg.caller)) {
                 case (?user) {
@@ -348,33 +338,20 @@ shared(msg) actor class NFToken(
                 };
                 case _ { };
             };
+            txid := addRecord(msg.caller, #revokeAll, null, msg.caller, operator, Time.now());
         };
-        let txid = addRecord(msg.caller, #unapproveAll, null, msg.caller, operator, Time.now());
         return true;
     };
 
     public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat) : async Bool {
+        assert(_isApprovedOrOwner(caller, tokenId));
+        _clearApproval(from, tokenId);
+        _transfer(to, tokenId);
         let txid = addRecord(msg.caller, #transfer, ?tokenId, from, to, Time.now());
-        return  _transferFrom(msg.caller, from, to, tokenId);
-    };
-
-    public shared(msg) func setTokenInfo(info: TokenInfoExt) : async Bool {
-        assert(_isOwner(msg.caller, info.index));
-        _updateTokenInfo(info);
         return true;
     };
 
     // public query function 
-
-    public query func getMetadata(): async Metadata {
-        {
-            name = name_;
-            desc = desc_;
-            totalSupply = totalSupply_;
-            owner = owner_;
-        }
-    };
-    
     public query func name() : async Text {
         return name_;
     };
@@ -383,32 +360,28 @@ shared(msg) actor class NFToken(
         return symbol_;
     };
 
-    public query func getTokenInfo(tokenId: Nat) : async TokenInfoExt {
-        switch(tokens.get(tokenId)){
-            case(?tokeninfo) {
-                return _tokenInfotoExt(tokeninfo);
-            };
-            case(_) {
-                throw Error.reject("token not exist");
-            };
-        };
-    };
-
-    public query func ownerOf(tokenId: Nat) : async Principal {
-        switch (_ownerOf(tokenId)) {
-            case (? owner) {
-                return owner;
-            };
-            case _ {
-                throw Error.reject("token not exist")
-            };
-        }
-    };
-
     public query func balanceOf(who: Principal) : async Nat {
         return _balanceOf(who);
     };
- 
+
+    public query func totalSupply() : async Nat {
+        return totalSupply_;
+    };
+
+    // get metadata about this NFT collection
+    public query func getMetadata(): async Metadata {
+        {
+            name = name_;
+            desc = desc_;
+            totalSupply = totalSupply_;
+            owner = owner_;
+        }
+    };
+
+    public query func isApprovedForAll(owner: Principal, operator: Principal) : async Bool {
+        return _isApprovedForAll(owner, operator);
+    };
+
     public query func getApproved(tokenId: Nat) : async Principal {
         switch (_exists(tokenId)) {
             case true {
@@ -427,49 +400,7 @@ shared(msg) actor class NFToken(
         }
     };
 
-    public query func isApprovedForAll(owner: Principal, operator: Principal) : async Bool {
-        return _isApprovedForAll(owner, operator);
-    };
-
-    public query func tokenOfOwnerByIndex(owner: Principal, index: Nat) : async Nat {
-        let balance = _balanceOf(owner);
-        assert(index < balance);
-        switch (users.get(owner)) {
-            case (?userInfo) {
-                return TrieSet.toArray(userInfo.tokens)[index];
-            };
-            case _ {
-                throw Error.reject("unauthorized")
-            };
-        };
-    };
-
-    public query func totalSupply() : async Nat {
-        return totalSupply_;
-    };
-
-    public query func tokenByIndex(index: Nat) : async Nat {
-        assert(index < tokens.size());
-        let tokenIds = Iter.toArray(Iter.map(tokens.entries(), func (i: (Nat, TokenInfo)): Nat {i.0}));
-        return tokenIds[index];
-    };
-
-    public query func getAllTokens() : async [Nat] {
-        Iter.toArray(Iter.map(tokens.entries(), func (i: (Nat, TokenInfo)): Nat {i.0}))
-    };
-
-    public query func getTokenList(owner: Principal) : async [Nat] {
-        switch (users.get(owner)) {
-            case (?user) {
-                return TrieSet.toArray(user.tokens);
-            };
-            case _ {
-                throw Error.reject("unauthorized");
-            };
-        };
-    };
-
-    public query func getUser(who: Principal) : async UserInfoExt {
+    public query func getUserInfo(who: Principal) : async UserInfoExt {
         switch (users.get(who)) {
             case (?user) {
                 return _userInfotoExt(user)
@@ -480,10 +411,49 @@ shared(msg) actor class NFToken(
         };        
     };
 
-    public query func getAllTxs(): async [OpRecord] {
-        return ops;
+    public query func getUserTokens(owner: Principal) : async [TokenInfoExt] {
+        let tokenIds = switch (users.get(owner)) {
+            case (?user) {
+                TrieSet.toArray(user.tokens)
+            };
+            case _ {
+                []
+            };
+        };
+        var ret: [TokenInfoExt] = [];
+        for(id in tokenIds) {
+            ret := Array.append(ret, [_tokenInfotoExt(_unwrap(tokens.get(id)))]);
+        };
+        return ret;
     };
 
+    public query func ownerOf(tokenId: Nat) : async Principal {
+        switch (_ownerOf(tokenId)) {
+            case (? owner) {
+                return owner;
+            };
+            case _ {
+                throw Error.reject("token not exist")
+            };
+        }
+    };
+
+    public query func getTokenInfo(tokenId: Nat) : async TokenInfoExt {
+        switch(tokens.get(tokenId)){
+            case(?tokeninfo) {
+                return _tokenInfotoExt(tokeninfo);
+            };
+            case(_) {
+                throw Error.reject("token not exist");
+            };
+        };
+    };
+
+    public query func getAllTokens() : async [TokenInfoExt] {
+        Iter.toArray(Iter.map(tokens.entries(), func (i: (Nat, TokenInfo)): TokenInfoExt {_tokenInfotoExt(i.1)}))
+    };
+
+    // transaction history related
     public query func historySize(): async Nat {
         return ops.size();
     };
@@ -522,6 +492,7 @@ shared(msg) actor class NFToken(
         return res;
     };
 
+    // upgrade functions
     system func preupgrade() {
         usersEntries := Iter.toArray(users.entries());
         tokensEntries := Iter.toArray(tokens.entries());
