@@ -49,15 +49,13 @@ shared(msg) actor class NFToken(
     private stable var totalSupply_: Nat = 0;
     private stable var blackhole: Principal = Principal.fromText("aaaaa-aa");
 
-    private stable var mintable_ : Bool = _mintable;
-    private stable var burnable_ : Bool = _burnable;
     private stable var tokensEntries : [(Nat, TokenInfo)] = [];
     private stable var usersEntries : [(Principal, UserInfo)] = [];
     private var tokens = HashMap.HashMap<Nat, TokenInfo>(1, Nat.equal, Hash.hash);
     private var users = HashMap.HashMap<Principal, UserInfo>(1, Principal.equal, Principal.hash);
     private stable var ops: [OpRecord] = [];
     private stable var txIndex: Nat = 0;
-    private stable var userTxs = HashMap.HashMap<Principal, [Nat]>(1, Principal.equal, Principal.hash);
+    private var userTxs = HashMap.HashMap<Principal, [Nat]>(1, Principal.equal, Principal.hash);
 
     private func addRecord(
         caller: Principal, op: Operation, tokenIndex: ?Nat,
@@ -243,7 +241,7 @@ shared(msg) actor class NFToken(
         _transfer(blackhole, tokenId);
     };
 
-    private func _mint(to: Principal, metadata: TokenMetadata) {
+    private func _mint(to: Principal, metadata: TokenMetadata): Nat {
         let token: TokenInfo = {
             index = totalSupply_;
             var owner = to;
@@ -271,10 +269,10 @@ shared(msg) actor class NFToken(
         return true;
     };
 
-    public shared(msg) func mint(to: Principal, tokenMetadata: TokenMetadata): async Nat{
+    public shared(msg) func mint(to: Principal, tokenMetadata: TokenMetadata): async Nat {
         let tokenId = _mint(to, tokenMetadata);
         let txid = addRecord(msg.caller, #mint, ?tokenId, blackhole, to, Time.now());
-        return tokenId;   
+        return tokenId;
     };
 
     public shared(msg) func approve(spender: Principal, tokenId: Nat) : async Bool {
