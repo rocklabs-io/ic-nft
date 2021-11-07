@@ -8,7 +8,6 @@
 
 import HashMap "mo:base/HashMap";
 import Principal "mo:base/Principal";
-import Types "./types";
 import Error "mo:base/Error";
 import Option "mo:base/Option";
 import Nat "mo:base/Nat";
@@ -22,6 +21,7 @@ import TrieSet "mo:base/TrieSet";
 import Array "mo:base/Array";
 import Debug "mo:base/Debug";
 import Prelude "mo:base/Prelude";
+import Types "./types";
 
 shared(msg) actor class NFToken(
     _name: Text, 
@@ -100,10 +100,9 @@ shared(msg) actor class NFToken(
         };
     };
 
-    // TODO
-    private func _isApprover(who: Principal, tokenId: Nat) : Bool {
+    private func _isApproved(who: Principal, tokenId: Nat) : Bool {
         switch (tokens.get(tokenId)) {
-            case (?info) { return info.approval == ?who; };
+            case (?info) { return info.operator == ?who; };
             case _ { return false; };
         }
     };
@@ -130,7 +129,7 @@ shared(msg) actor class NFToken(
             owner = info.owner;
             metadata = info.metadata;
             timestamp = info.timestamp;
-            approval = info.approval;
+            operator = info.operator;
         };
     };
 
@@ -146,7 +145,7 @@ shared(msg) actor class NFToken(
     private func _isApprovedOrOwner(spender: Principal, tokenId: Nat) : Bool {
         switch (_ownerOf(tokenId)) {
             case (?owner) {
-                return spender == owner or _isApprover(spender, tokenId) or _isApprovedForAll(owner, spender);
+                return spender == owner or _isApproved(spender, tokenId) or _isApprovedForAll(owner, spender);
             };
             case _ {
                 return false;
@@ -157,7 +156,7 @@ shared(msg) actor class NFToken(
     private func _getApproved(tokenId: Nat) : ?Principal {
         switch (tokens.get(tokenId)) {
             case (?info) {
-                return info.approval;
+                return info.operator;
             };
             case (_) {
                 return null;
@@ -205,12 +204,12 @@ shared(msg) actor class NFToken(
         assert(_exists(tokenId) and _isOwner(owner, tokenId));
         switch (tokens.get(tokenId)) {
             case (?info) {
-                if (info.approval != null) {
-                    let approver = _unwrap(info.approval);
-                    let approverInfo = _unwrap(users.get(approver));
-                    approverInfo.allowedIds := TrieSet.delete(approverInfo.allowedIds, tokenId, Hash.hash(tokenId), Nat.equal);
-                    users.put(approver, approverInfo);
-                    info.approval := null;
+                if (info.operator != null) {
+                    let op = _unwrap(info.operator);
+                    let opInfo = _unwrap(users.get(op));
+                    opInfo.allowedIds := TrieSet.delete(opInfo.allowedIds, tokenId, Hash.hash(tokenId), Nat.equal);
+                    users.put(op, opInfo);
+                    info.operator := null;
                     tokens.put(tokenId, info);
                 }
             };
@@ -245,8 +244,8 @@ shared(msg) actor class NFToken(
             index = totalSupply_;
             var owner = to;
             var metadata = metadata;
+            var operator = null;
             timestamp = Time.now();
-            var approval = null;
         };
         tokens.put(totalSupply_, token);
         _addTokenTo(to, totalSupply_);
@@ -284,7 +283,7 @@ shared(msg) actor class NFToken(
         assert(owner != spender);
         switch (tokens.get(tokenId)) {
             case (?info) {
-                info.approval := ?spender;
+                info.operator := ?spender;
                 tokens.put(tokenId, info);
             };
             case _ {

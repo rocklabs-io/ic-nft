@@ -37,7 +37,7 @@ module {
         index: Nat;
         var owner: Principal;
         var metadata: TokenMetadata;
-        var approval: ?Principal;
+        var operator: ?Principal;
         timestamp: Time.Time;
     };
 
@@ -45,7 +45,7 @@ module {
         index: Nat;
         owner: Principal;
         metadata: TokenMetadata;
-        approval: ?Principal;
+        operator: ?Principal;
         timestamp: Time.Time;
     };
 
