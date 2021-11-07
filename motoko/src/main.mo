@@ -31,7 +31,6 @@ shared(msg) actor class NFToken(
     ) = this {
 
     type Metadata = Types.Metadata;
-    type FileType = Types.FileType;
     type Location = Types.Location;
     type Attribute = Types.Attribute;
     type TokenMetadata = Types.TokenMetadata;

@@ -17,11 +17,6 @@ module {
         owner: Principal;
     };
 
-    public type FileType = {
-        #jpg;
-        #png;
-        #mp4;
-    };
     public type Location = {
         #InCanister: Blob; // NFT encoded data
         #AssetCanister: (Principal, Blob); // asset canister id, storage key
@@ -33,7 +28,7 @@ module {
         value: Text;
     };
     public type TokenMetadata = {
-        filetype: FileType;
+        filetype: Text; // jpg, png, mp4, etc.
         location: Location;
         attributes: [Attribute];
     };
