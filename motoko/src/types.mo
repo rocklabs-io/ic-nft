@@ -11,6 +11,7 @@ import TrieSet "mo:base/TrieSet";
 
 module {
     public type Metadata = {
+        logo: Text;
         name: Text;
         desc: Text;
         totalSupply: Nat;

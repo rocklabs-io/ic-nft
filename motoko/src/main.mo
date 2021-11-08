@@ -25,6 +25,7 @@ import Debug "mo:base/Debug";
 import Types "./types";
 
 shared(msg) actor class NFToken(
+    _logo: Text,
     _name: Text, 
     _symbol: Text,
     _desc: Text,
@@ -46,11 +47,12 @@ shared(msg) actor class NFToken(
     public type Error = {
         #Unauthorized;
         #TokenNotExist;
-        #InvalidSpender;
+        #InvalidOperator;
     };
     public type TxReceipt = Result.Result<Nat, Error>;
     public type MintResult = Result.Result<(Nat, Nat), Error>; // token index, txid
 
+    private stable var logo_ : Text = _logo; // base64 encoded image
     private stable var name_ : Text = _name;
     private stable var symbol_ : Text = _symbol;
     private stable var desc_ : Text = _desc;
@@ -284,7 +286,7 @@ shared(msg) actor class NFToken(
         return #ok(txid);
     };
 
-    public shared(msg) func approve(spender: Principal, tokenId: Nat) : async TxReceipt {
+    public shared(msg) func approve(tokenId: Nat, operator: Principal) : async TxReceipt {
         var owner: Principal = switch (_ownerOf(tokenId)) {
             case (?own) {
                 own;
@@ -296,39 +298,39 @@ shared(msg) actor class NFToken(
         if(Principal.equal(msg.caller, owner) == false or _isApprovedForAll(owner, msg.caller) == false) {
             return #err(#Unauthorized);
         };
-        if(owner == spender) {
-            return #err(#InvalidSpender);
+        if(owner == operator) {
+            return #err(#InvalidOperator);
         };
         switch (tokens.get(tokenId)) {
             case (?info) {
-                info.operator := ?spender;
+                info.operator := ?operator;
                 tokens.put(tokenId, info);
             };
             case _ {
                 return #err(#TokenNotExist);
             };
         };
-        switch (users.get(spender)) {
+        switch (users.get(operator)) {
             case (?user) {
                 user.allowedTokens := TrieSet.put(user.allowedTokens, tokenId, Hash.hash(tokenId), Nat.equal);
-                users.put(spender, user);
+                users.put(operator, user);
             };
             case _ {
                 let user = _newUser();
                 user.allowedTokens := TrieSet.put(user.allowedTokens, tokenId, Hash.hash(tokenId), Nat.equal);
-                users.put(spender, user);
+                users.put(operator, user);
             };
         };
-        let txid = addTxRecord(msg.caller, #approve, ?tokenId, #user(msg.caller), #user(spender), Time.now());
+        let txid = addTxRecord(msg.caller, #approve, ?tokenId, #user(msg.caller), #user(operator), Time.now());
         return #ok(txid);
     };
 
-    public shared(msg) func setApprovalForAll(operator: Principal, approved: Bool) : async TxReceipt {
+    public shared(msg) func setApprovalForAll(operator: Principal, value: Bool): async TxReceipt {
         if(msg.caller == operator) {
             return #err(#Unauthorized);
         };
         var txid = 0;
-        if approved {
+        if value {
             let caller = switch (users.get(msg.caller)) {
                 case (?user) { user };
                 case _ { _newUser() };
@@ -362,7 +364,7 @@ shared(msg) actor class NFToken(
         return #ok(txid);
     };
 
-    public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat) : async TxReceipt {
+    public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat): async TxReceipt {
         if(_isApprovedOrOwner(msg.caller, tokenId) == false) {
             return #err(#Unauthorized);
         };
@@ -373,25 +375,34 @@ shared(msg) actor class NFToken(
     };
 
     // public query function 
-    public query func name() : async Text {
+    public query func logo(): async Text {
+        return logo_;
+    };
+
+    public query func name(): async Text {
         return name_;
     };
 
-    public query func symbol() : async Text {
+    public query func symbol(): async Text {
         return symbol_;
     };
 
-    public query func balanceOf(who: Principal) : async Nat {
+    public query func desc(): async Text {
+        return desc_;
+    };
+
+    public query func balanceOf(who: Principal): async Nat {
         return _balanceOf(who);
     };
 
-    public query func totalSupply() : async Nat {
+    public query func totalSupply(): async Nat {
         return totalSupply_;
     };
 
     // get metadata about this NFT collection
     public query func getMetadata(): async Metadata {
         {
+            logo = logo_;
             name = name_;
             desc = desc_;
             totalSupply = totalSupply_;
@@ -403,7 +414,7 @@ shared(msg) actor class NFToken(
         return _isApprovedForAll(owner, operator);
     };
 
-    public query func getApproved(tokenId: Nat) : async Principal {
+    public query func getOperator(tokenId: Nat) : async Principal {
         switch (_exists(tokenId)) {
             case true {
                 switch (_getApproved(tokenId)) {
@@ -448,7 +459,7 @@ shared(msg) actor class NFToken(
         return ret;
     };
 
-    public query func ownerOf(tokenId: Nat) : async Principal {
+    public query func ownerOf(tokenId: Nat): async Principal {
         switch (_ownerOf(tokenId)) {
             case (?owner) {
                 return owner;
@@ -470,6 +481,7 @@ shared(msg) actor class NFToken(
         };
     };
 
+    // Optional
     public query func getAllTokens() : async [TokenInfoExt] {
         Iter.toArray(Iter.map(tokens.entries(), func (i: (Nat, TokenInfo)): TokenInfoExt {_tokenInfotoExt(i.1)}))
     };
@@ -479,18 +491,18 @@ shared(msg) actor class NFToken(
         return txs.size();
     };
 
-    public query func getTransactions(start: Nat, num: Nat): async [TxRecord] {
+    public query func getTransaction(index: Nat): async TxRecord {
+        return txs[index];
+    };
+
+    public query func getTransactions(start: Nat, limit: Nat): async [TxRecord] {
         var res: [TxRecord] = [];
         var i = start;
-        while (i < start + num and i < txs.size()) {
+        while (i < start + limit and i < txs.size()) {
             res := Array.append(res, [txs[i]]);
             i += 1;
         };
         return res;
-    };
-
-    public query func getTransaction(index: Nat): async TxRecord {
-        return txs[index];
     };
 
     public query func getUserTransactionAmount(user: Principal): async Nat {
@@ -503,11 +515,20 @@ shared(msg) actor class NFToken(
         return res;
     };
 
-    public query func getUserTransactions(user: Principal): async [TxRecord] {
+    public query func getUserTransactions(user: Principal, start: Nat, limit: Nat): async [TxRecord] {
         var res: [TxRecord] = [];
-        for (i in txs.vals()) {
+        var idx = start;
+        label l for (i in txs.vals()) {
             if (i.caller == user or i.from == #user(user) or i.to == #user(user)) {
+                if(idx < start) {
+                    idx += 1;
+                    continue l;
+                };
+                if(idx >= start + limit) {
+                    break l;
+                };
                 res := Array.append<TxRecord>(res, [i]);
+                idx += 1;
             };
         };
         return res;
