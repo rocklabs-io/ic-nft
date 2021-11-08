@@ -35,7 +35,8 @@ shared(msg) actor class NFToken(
     type Location = Types.Location;
     type Attribute = Types.Attribute;
     type TokenMetadata = Types.TokenMetadata;
-    type OpRecord = Types.OpRecord;
+    type Record = Types.Record;
+    type TxRecord = Types.TxRecord;
     type Operation = Types.Operation;
     type TokenInfo = Types.TokenInfo;
     type TokenInfoExt = Types.TokenInfoExt;
@@ -61,15 +62,15 @@ shared(msg) actor class NFToken(
     private stable var usersEntries : [(Principal, UserInfo)] = [];
     private var tokens = HashMap.HashMap<Nat, TokenInfo>(1, Nat.equal, Hash.hash);
     private var users = HashMap.HashMap<Principal, UserInfo>(1, Principal.equal, Principal.hash);
-    private stable var ops: [OpRecord] = [];
+    private stable var txs: [TxRecord] = [];
     private stable var txIndex: Nat = 0;
 
-    private func addRecord(
+    private func addTxRecord(
         caller: Principal, op: Operation, tokenIndex: ?Nat,
-        from: Principal, to: Principal, timestamp: Time.Time
+        from: Record, to: Record, timestamp: Time.Time
     ): Nat {
-        let index = ops.size();
-        let record: OpRecord = {
+        let index = txs.size();
+        let record: TxRecord = {
             caller = caller;
             op = op;
             index = index;
@@ -78,7 +79,7 @@ shared(msg) actor class NFToken(
             to = to;
             timestamp = timestamp;
         };
-        ops := Array.append(ops, [record]);
+        txs := Array.append(txs, [record]);
         return index;
     };
 
@@ -263,7 +264,7 @@ shared(msg) actor class NFToken(
         tokens.put(totalSupply_, token);
         _addTokenTo(to, totalSupply_);
         totalSupply_ += 1;
-        let txid = addRecord(msg.caller, #mint, ?token.index, blackhole, to, Time.now());
+        let txid = addTxRecord(msg.caller, #mint(metadata), ?token.index, #user(blackhole), #user(to), Time.now());
         return #ok((token.index, txid));
     };
 
@@ -276,9 +277,11 @@ shared(msg) actor class NFToken(
             return #err(#TokenNotExist)
         };
         let token = _unwrap(tokens.get(tokenId));
+        let before = token.metadata;
         token.metadata := metadata;
         tokens.put(tokenId, token);
-        return #ok(0);
+        let txid = addTxRecord(msg.caller, #setMetadata, ?token.index, #metadata(before), #metadata(metadata), Time.now());
+        return #ok(txid);
     };
 
     public shared(msg) func approve(spender: Principal, tokenId: Nat) : async TxReceipt {
@@ -316,7 +319,7 @@ shared(msg) actor class NFToken(
                 users.put(spender, user);
             };
         };
-        let txid = addRecord(msg.caller, #approve, ?tokenId, msg.caller, spender, Time.now());
+        let txid = addTxRecord(msg.caller, #approve, ?tokenId, #user(msg.caller), #user(spender), Time.now());
         return #ok(txid);
     };
 
@@ -338,7 +341,7 @@ shared(msg) actor class NFToken(
             };
             user.allowedBy := TrieSet.put(user.allowedBy, msg.caller, Principal.hash(msg.caller), Principal.equal);
             users.put(operator, user);
-            txid := addRecord(msg.caller, #approveAll, null, msg.caller, operator, Time.now());
+            txid := addTxRecord(msg.caller, #approveAll, null, #user(msg.caller), #user(operator), Time.now());
         } else {
             switch (users.get(msg.caller)) {
                 case (?user) {
@@ -354,7 +357,7 @@ shared(msg) actor class NFToken(
                 };
                 case _ { };
             };
-            txid := addRecord(msg.caller, #revokeAll, null, msg.caller, operator, Time.now());
+            txid := addTxRecord(msg.caller, #revokeAll, null, #user(msg.caller), #user(operator), Time.now());
         };
         return #ok(txid);
     };
@@ -365,7 +368,7 @@ shared(msg) actor class NFToken(
         };
         _clearApproval(from, tokenId);
         _transfer(to, tokenId);
-        let txid = addRecord(msg.caller, #transfer, ?tokenId, from, to, Time.now());
+        let txid = addTxRecord(msg.caller, #transfer, ?tokenId, #user(from), #user(to), Time.now());
         return #ok(txid);
     };
 
@@ -473,38 +476,38 @@ shared(msg) actor class NFToken(
 
     // transaction history related
     public query func historySize(): async Nat {
-        return ops.size();
+        return txs.size();
     };
 
-    public query func getTransactions(start: Nat, num: Nat): async [OpRecord] {
-        var res: [OpRecord] = [];
+    public query func getTransactions(start: Nat, num: Nat): async [TxRecord] {
+        var res: [TxRecord] = [];
         var i = start;
-        while (i < start + num and i < ops.size()) {
-            res := Array.append(res, [ops[i]]);
+        while (i < start + num and i < txs.size()) {
+            res := Array.append(res, [txs[i]]);
             i += 1;
         };
         return res;
     };
 
-    public query func getTransaction(index: Nat): async OpRecord {
-        return ops[index];
+    public query func getTransaction(index: Nat): async TxRecord {
+        return txs[index];
     };
 
     public query func getUserTransactionAmount(user: Principal): async Nat {
         var res: Nat = 0;
-        for (i in ops.vals()) {
-            if (i.caller == user or i.from == user or i.to == user) {
+        for (i in txs.vals()) {
+            if (i.caller == user or i.from == #user(user) or i.to == #user(user)) {
                 res += 1;
             };
         };
         return res;
     };
 
-    public query func getUserTransactions(user: Principal): async [OpRecord] {
-        var res: [OpRecord] = [];
-        for (i in ops.vals()) {
-            if (i.caller == user or i.from == user or i.to == user) {
-                res := Array.append<OpRecord>(res, [i]);
+    public query func getUserTransactions(user: Principal): async [TxRecord] {
+        var res: [TxRecord] = [];
+        for (i in txs.vals()) {
+            if (i.caller == user or i.from == #user(user) or i.to == #user(user)) {
+                res := Array.append<TxRecord>(res, [i]);
             };
         };
         return res;
