@@ -270,6 +270,18 @@ shared(msg) actor class NFToken(
         return #ok((token.index, txid));
     };
 
+    public shared(msg) func burn(tokenId: Nat): async MintResult {
+        if(_exists(tokenId) == false) {
+            return #err(#TokenNotExist)
+        };
+        if(_isOwner(msg.caller, tokenId) == false) {
+            return #err(#Unauthorized);
+        };
+        _burn(msg.caller, tokenId); //not delete tokenId from tokens temporarily. (consider storage limited, it should be delete.)
+        let txid = addTxRecord(msg.caller, #burn, ?tokenId, #user(msg.caller), #user(blackhole), Time.now());
+        return #ok((tokenId, txid));
+    };
+
     public shared(msg) func setTokenMetadata(tokenId: Nat, new_metadata: TokenMetadata) : async TxReceipt {
         // only NFT owner can do this
         if(msg.caller == owner_) {
