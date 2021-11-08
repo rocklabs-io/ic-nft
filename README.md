@@ -1,6 +1,6 @@
 ## Non-fungible Token Standard for the IC
 
-This is an NFT standard implementation for the DFINITY Internet Computer, the interfaces mainly follow the ERC721 standard, and we also added support for transaction history storage and query.
+This is an NFT standard implementation for the DFINITY Internet Computer, the interfaces mainly follow the ERC721 standard, and we also added support for transaction history storage and query, make NFTs(including their metadata) traceable and verifiable.
 
 Read the [specification file](./spec.md) for details.
 
