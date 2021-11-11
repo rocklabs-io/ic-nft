@@ -283,8 +283,8 @@ shared(msg) actor class NFToken(
     };
 
     public shared(msg) func setTokenMetadata(tokenId: Nat, new_metadata: TokenMetadata) : async TxReceipt {
-        // only NFT owner can do this
-        if(msg.caller == owner_) {
+        // only canister owner can set
+        if(msg.caller != owner_) {
             return #err(#Unauthorized);
         };
         if(_exists(tokenId) == false) {
@@ -307,9 +307,9 @@ shared(msg) actor class NFToken(
                 return #err(#TokenNotExist)
             }
         };
-        if(Principal.equal(msg.caller, owner) == false or _isApprovedForAll(owner, msg.caller) == false) {
-            return #err(#Unauthorized);
-        };
+        if(Principal.equal(msg.caller, owner) == false)
+            if(_isApprovedForAll(owner, msg.caller) == false)
+                return #err(#Unauthorized);
         if(owner == operator) {
             return #err(#InvalidOperator);
         };
@@ -376,13 +376,33 @@ shared(msg) actor class NFToken(
         return #ok(txid);
     };
 
+    public shared(msg) func transfer(to: Principal, tokenId: Nat): async TxReceipt {
+        var owner: Principal = switch (_ownerOf(tokenId)) {
+            case (?own) {
+                own;
+            };
+            case (_) {
+                return #err(#TokenNotExist)
+            }
+        };
+        if (owner != msg.caller) {
+            return #err(#Unauthorized);
+        };
+        _transfer(to, tokenId);
+        let txid = addTxRecord(msg.caller, #transfer, ?tokenId, #user(msg.caller), #user(to), Time.now());
+        return #ok(txid);
+    };
+
     public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat): async TxReceipt {
+        if(_exists(tokenId) == false) {
+            return #err(#TokenNotExist)
+        };
         if(_isApprovedOrOwner(msg.caller, tokenId) == false) {
             return #err(#Unauthorized);
         };
         _clearApproval(from, tokenId);
         _transfer(to, tokenId);
-        let txid = addTxRecord(msg.caller, #transfer, ?tokenId, #user(from), #user(to), Time.now());
+        let txid = addTxRecord(msg.caller, #transferFrom, ?tokenId, #user(from), #user(to), Time.now());
         return #ok(txid);
     };
 
@@ -416,6 +436,7 @@ shared(msg) actor class NFToken(
         {
             logo = logo_;
             name = name_;
+            symbol = symbol_;
             desc = desc_;
             totalSupply = totalSupply_;
             owner = owner_;

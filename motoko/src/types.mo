@@ -13,6 +13,7 @@ module {
     public type Metadata = {
         logo: Text;
         name: Text;
+        symbol: Text;
         desc: Text;
         totalSupply: Nat;
         owner: Principal;
@@ -68,6 +69,7 @@ module {
         #mint: TokenMetadata;  
         #burn;
         #transfer;
+        #transferFrom;
         #approve;
         #approveAll;
         #revokeAll; // revoke approvals
