@@ -69,6 +69,7 @@ module {
         #mint: TokenMetadata;  
         #burn;
         #transfer;
+        #transferFrom;
         #approve;
         #approveAll;
         #revokeAll; // revoke approvals

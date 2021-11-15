@@ -71,18 +71,18 @@ shared(msg) actor class NFToken(
         caller: Principal, op: Operation, tokenIndex: ?Nat,
         from: Record, to: Record, timestamp: Time.Time
     ): Nat {
-        let index = txs.size();
         let record: TxRecord = {
             caller = caller;
             op = op;
-            index = index;
+            index = txIndex;
             tokenIndex = tokenIndex;
             from = from;
             to = to;
             timestamp = timestamp;
         };
         txs := Array.append(txs, [record]);
-        return index;
+        txIndex += 1;
+        return txIndex - 1;
     };
 
     private func _unwrap<T>(x : ?T) : T =
@@ -270,19 +270,31 @@ shared(msg) actor class NFToken(
         return #ok((token.index, txid));
     };
 
-    public shared(msg) func setTokenMetadata(tokenId: Nat, metadata: TokenMetadata) : async TxReceipt {
-        // only NFT issuer can do this
-        if(msg.caller == owner_) {
+    public shared(msg) func burn(tokenId: Nat): async MintResult {
+        if(_exists(tokenId) == false) {
+            return #err(#TokenNotExist)
+        };
+        if(_isOwner(msg.caller, tokenId) == false) {
+            return #err(#Unauthorized);
+        };
+        _burn(msg.caller, tokenId); //not delete tokenId from tokens temporarily. (consider storage limited, it should be delete.)
+        let txid = addTxRecord(msg.caller, #burn, ?tokenId, #user(msg.caller), #user(blackhole), Time.now());
+        return #ok((tokenId, txid));
+    };
+
+    public shared(msg) func setTokenMetadata(tokenId: Nat, new_metadata: TokenMetadata) : async TxReceipt {
+        // only canister owner can set
+        if(msg.caller != owner_) {
             return #err(#Unauthorized);
         };
         if(_exists(tokenId) == false) {
             return #err(#TokenNotExist)
         };
         let token = _unwrap(tokens.get(tokenId));
-        let before = token.metadata;
-        token.metadata := metadata;
+        let old_metadate = token.metadata;
+        token.metadata := new_metadata;
         tokens.put(tokenId, token);
-        let txid = addTxRecord(msg.caller, #setMetadata, ?token.index, #metadata(before), #metadata(metadata), Time.now());
+        let txid = addTxRecord(msg.caller, #setMetadata, ?token.index, #metadata(old_metadate), #metadata(new_metadata), Time.now());
         return #ok(txid);
     };
 
@@ -295,9 +307,9 @@ shared(msg) actor class NFToken(
                 return #err(#TokenNotExist)
             }
         };
-        if(Principal.equal(msg.caller, owner) == false or _isApprovedForAll(owner, msg.caller) == false) {
-            return #err(#Unauthorized);
-        };
+        if(Principal.equal(msg.caller, owner) == false)
+            if(_isApprovedForAll(owner, msg.caller) == false)
+                return #err(#Unauthorized);
         if(owner == operator) {
             return #err(#InvalidOperator);
         };
@@ -364,13 +376,33 @@ shared(msg) actor class NFToken(
         return #ok(txid);
     };
 
+    public shared(msg) func transfer(to: Principal, tokenId: Nat): async TxReceipt {
+        var owner: Principal = switch (_ownerOf(tokenId)) {
+            case (?own) {
+                own;
+            };
+            case (_) {
+                return #err(#TokenNotExist)
+            }
+        };
+        if (owner != msg.caller) {
+            return #err(#Unauthorized);
+        };
+        _transfer(to, tokenId);
+        let txid = addTxRecord(msg.caller, #transfer, ?tokenId, #user(msg.caller), #user(to), Time.now());
+        return #ok(txid);
+    };
+
     public shared(msg) func transferFrom(from: Principal, to: Principal, tokenId: Nat): async TxReceipt {
+        if(_exists(tokenId) == false) {
+            return #err(#TokenNotExist)
+        };
         if(_isApprovedOrOwner(msg.caller, tokenId) == false) {
             return #err(#Unauthorized);
         };
         _clearApproval(from, tokenId);
         _transfer(to, tokenId);
-        let txid = addTxRecord(msg.caller, #transfer, ?tokenId, #user(from), #user(to), Time.now());
+        let txid = addTxRecord(msg.caller, #transferFrom, ?tokenId, #user(from), #user(to), Time.now());
         return #ok(txid);
     };
 
@@ -518,7 +550,7 @@ shared(msg) actor class NFToken(
 
     public query func getUserTransactions(user: Principal, start: Nat, limit: Nat): async [TxRecord] {
         var res: [TxRecord] = [];
-        var idx = start;
+        var idx = 0;
         label l for (i in txs.vals()) {
             if (i.caller == user or i.from == #user(user) or i.to == #user(user)) {
                 if(idx < start) {
