@@ -13,6 +13,7 @@ module {
     public type Metadata = {
         logo: Text;
         name: Text;
+        symbol: Text;
         desc: Text;
         totalSupply: Nat;
         owner: Principal;

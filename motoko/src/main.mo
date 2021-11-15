@@ -404,6 +404,7 @@ shared(msg) actor class NFToken(
         {
             logo = logo_;
             name = name_;
+            symbol = symbol_;
             desc = desc_;
             totalSupply = totalSupply_;
             owner = owner_;
