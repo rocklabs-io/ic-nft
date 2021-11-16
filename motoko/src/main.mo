@@ -7,6 +7,7 @@
  */
 
 import HashMap "mo:base/HashMap";
+import Cycles "mo:base/ExperimentalCycles";
 import Principal "mo:base/Principal";
 import Error "mo:base/Error";
 import Option "mo:base/Option";
@@ -478,6 +479,7 @@ shared(msg) actor class NFToken(
             desc = desc_;
             totalSupply = totalSupply_;
             owner = owner_;
+            cycles = Cycles.balance();
         }
     };
 

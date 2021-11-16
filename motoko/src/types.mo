@@ -17,6 +17,7 @@ module {
         desc: Text;
         totalSupply: Nat;
         owner: Principal;
+        cycles: Nat;
     };
 
     public type Location = {
