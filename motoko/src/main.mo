@@ -252,7 +252,7 @@ shared(msg) actor class NFToken(
     };
 
     // public update calls
-    public shared(msg) func mint(to: Principal, metadata: TokenMetadata): async MintResult {
+    public shared(msg) func mint(to: Principal, metadata: ?TokenMetadata): async MintResult {
         if(msg.caller != owner_) {
             return #err(#Unauthorized);
         };
@@ -270,7 +270,28 @@ shared(msg) actor class NFToken(
         return #ok((token.index, txid));
     };
 
-    public shared(msg) func burn(tokenId: Nat): async MintResult {
+    public shared(msg) func batchMint(to: Principal, arr: [?TokenMetadata]): async MintResult {
+        if(msg.caller != owner_) {
+            return #err(#Unauthorized);
+        };
+        let startIndex = totalSupply_;
+        for(metadata in Iter.fromArray(arr)) {
+            let token: TokenInfo = {
+                index = totalSupply_;
+                var owner = to;
+                var metadata = metadata;
+                var operator = null;
+                timestamp = Time.now();
+            };
+            tokens.put(totalSupply_, token);
+            _addTokenTo(to, totalSupply_);
+            totalSupply_ += 1;
+            ignore addTxRecord(msg.caller, #mint(metadata), ?token.index, #user(blackhole), #user(to), Time.now());
+        };
+        return #ok((startIndex, txs.size() - arr.size()));
+    };
+
+    public shared(msg) func burn(tokenId: Nat): async TxReceipt {
         if(_exists(tokenId) == false) {
             return #err(#TokenNotExist)
         };
@@ -279,7 +300,7 @@ shared(msg) actor class NFToken(
         };
         _burn(msg.caller, tokenId); //not delete tokenId from tokens temporarily. (consider storage limited, it should be delete.)
         let txid = addTxRecord(msg.caller, #burn, ?tokenId, #user(msg.caller), #user(blackhole), Time.now());
-        return #ok((tokenId, txid));
+        return #ok(txid);
     };
 
     public shared(msg) func setTokenMetadata(tokenId: Nat, new_metadata: TokenMetadata) : async TxReceipt {
@@ -292,9 +313,9 @@ shared(msg) actor class NFToken(
         };
         let token = _unwrap(tokens.get(tokenId));
         let old_metadate = token.metadata;
-        token.metadata := new_metadata;
+        token.metadata := ?new_metadata;
         tokens.put(tokenId, token);
-        let txid = addTxRecord(msg.caller, #setMetadata, ?token.index, #metadata(old_metadate), #metadata(new_metadata), Time.now());
+        let txid = addTxRecord(msg.caller, #setMetadata, ?token.index, #metadata(old_metadate), #metadata(?new_metadata), Time.now());
         return #ok(txid);
     };
 
@@ -404,6 +425,23 @@ shared(msg) actor class NFToken(
         _transfer(to, tokenId);
         let txid = addTxRecord(msg.caller, #transferFrom, ?tokenId, #user(from), #user(to), Time.now());
         return #ok(txid);
+    };
+
+    public shared(msg) func batchTransferFrom(from: Principal, to: Principal, tokenIds: [Nat]): async TxReceipt {
+        var num: Nat = 0;
+        label l for(tokenId in Iter.fromArray(tokenIds)) {
+            if(_exists(tokenId) == false) {
+                continue l;
+            };
+            if(_isApprovedOrOwner(msg.caller, tokenId) == false) {
+                continue l;
+            };
+            _clearApproval(from, tokenId);
+            _transfer(to, tokenId);
+            num += 1;
+            ignore addTxRecord(msg.caller, #transferFrom, ?tokenId, #user(from), #user(to), Time.now());
+        };
+        return #ok(txs.size() - num);
     };
 
     // public query function 
