@@ -427,6 +427,23 @@ shared(msg) actor class NFToken(
         return #ok(txid);
     };
 
+    public shared(msg) func batchTransferFrom(from: Principal, to: Principal, tokenIds: [Nat]): async TxReceipt {
+        var num: Nat = 0;
+        label l for(tokenId in Iter.fromArray(tokenIds)) {
+            if(_exists(tokenId) == false) {
+                continue l;
+            };
+            if(_isApprovedOrOwner(msg.caller, tokenId) == false) {
+                continue l;
+            };
+            _clearApproval(from, tokenId);
+            _transfer(to, tokenId);
+            num += 1;
+            ignore addTxRecord(msg.caller, #transferFrom, ?tokenId, #user(from), #user(to), Time.now());
+        };
+        return #ok(txs.size() - num);
+    };
+
     // public query function 
     public query func logo(): async Text {
         return logo_;
