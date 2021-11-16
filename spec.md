@@ -17,6 +17,7 @@ NFTs are basic building blocks for the web3 economy, such as gaming, social netw
    public type Metadata = {
    		logo: Text;
        name: Text;
+       symbol: Text;
        desc: Text;
        totalSupply: Nat;
        owner: Principal;
@@ -49,7 +50,7 @@ NFTs are basic building blocks for the web3 economy, such as gaming, social netw
    public type TokenInfo = {
        index: Nat;
        var owner: Principal;
-       var metadata: TokenMetadata;
+       var metadata: ?TokenMetadata;
        var operator: ?Principal;
        timestamp: Time.Time;
    };
@@ -71,7 +72,7 @@ NFTs are basic building blocks for the web3 economy, such as gaming, social netw
    ```
    /// Update call operations
    public type Operation = {
-       #mint: TokenMetadata;  
+       #mint: ?TokenMetadata;  
        #burn;
        #transfer;
        #approve;
@@ -82,7 +83,7 @@ NFTs are basic building blocks for the web3 economy, such as gaming, social netw
    /// Update call operation record fields
    public type Record = {
        #user: Principal;
-       #metadata: TokenMetadata; // op == #setMetadata
+       #metadata: ?TokenMetadata; // op == #setMetadata
    };
    public type TxRecord = {
        caller: Principal;
@@ -113,10 +114,10 @@ NFTs are basic building blocks for the web3 economy, such as gaming, social netw
 
 ##### mint
 
-Mint a new token with metadata `metadata` to user `to`, returns a `TxReceipt`.
+Mint a new token with metadata `metadata` to user `to`, returns a `TxReceipt`. Note that `metadata` can be `null` when mint, and can be set later with `setTokenMetadata` interface.
 
 ```
-public shared(msg) func mint(to: Principal, metadata: TokenMetadata): async MintResult
+public shared(msg) func mint(to: Principal, metadata: ?TokenMetadata): async MintResult
 ```
 
 ##### setTokenMetadata
@@ -307,6 +308,14 @@ Burn the token `tokenId`, only the owner of the token can do this.
 
 ```
 public func burn(tokenId: Nat): async TxReceipt
+```
+
+##### batchMint
+
+Mint multiple NFTs in one update call, only the NFT issuer can do this.
+
+```
+public shared(msg) func batchMint(to: Principal, arr: [?TokenMetadata]): async MintResult
 ```
 
 #### Query calls

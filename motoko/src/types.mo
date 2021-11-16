@@ -38,7 +38,7 @@ module {
     public type TokenInfo = {
         index: Nat;
         var owner: Principal;
-        var metadata: TokenMetadata;
+        var metadata: ?TokenMetadata;
         var operator: ?Principal;
         timestamp: Time.Time;
     };
@@ -46,7 +46,7 @@ module {
     public type TokenInfoExt = {
         index: Nat;
         owner: Principal;
-        metadata: TokenMetadata;
+        metadata: ?TokenMetadata;
         operator: ?Principal;
         timestamp: Time.Time;
     };
@@ -66,7 +66,7 @@ module {
     };
     /// Update call operations
     public type Operation = {
-        #mint: TokenMetadata;  
+        #mint: ?TokenMetadata;  
         #burn;
         #transfer;
         #transferFrom;
@@ -78,7 +78,7 @@ module {
     /// Update call operation record fields
     public type Record = {
         #user: Principal;
-        #metadata: TokenMetadata; // op == #setMetadata
+        #metadata: ?TokenMetadata; // op == #setMetadata
     };
     public type TxRecord = {
         caller: Principal;
