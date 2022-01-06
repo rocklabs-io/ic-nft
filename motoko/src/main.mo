@@ -410,6 +410,7 @@ shared(msg) actor class NFToken(
         if (owner != msg.caller) {
             return #err(#Unauthorized);
         };
+        _clearApproval(msg.caller, tokenId);
         _transfer(to, tokenId);
         let txid = addTxRecord(msg.caller, #transfer, ?tokenId, #user(msg.caller), #user(to), Time.now());
         return #ok(txid);
