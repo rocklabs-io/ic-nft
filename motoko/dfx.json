@@ -3,6 +3,10 @@
     "nft": {
       "main": "src/main.mo",
       "type": "motoko"
+    },
+	"sale": {
+      "main": "src/sale.mo",
+      "type": "motoko"
     }
   },
   "defaults": {
