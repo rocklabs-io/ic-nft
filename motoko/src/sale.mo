@@ -30,7 +30,17 @@ shared(msg) actor class NFTSale(
     _name: Text, 
     _symbol: Text,
     _desc: Text,
-    _owner: Principal
+    _owner: Principal,
+    _startTime: Int,
+    _endTime: Int,
+    _minPerUser: Nat,
+    _maxPerUser: Nat,
+    _amount: Nat,
+    _devFee: Nat, // /1e6
+    _devAddr: Principal,
+    _price: Nat,
+    _paymentToken: Principal,
+    _whitelist: ?Principal
     ) = this {
 
     type Metadata = Types.Metadata;
@@ -136,7 +146,22 @@ shared(msg) actor class NFTSale(
         check: shared(user: Principal) -> async Bool;
     };
 
-    private stable var saleInfo: ?SaleInfo = null;
+    private stable var saleInfo: ?SaleInfo = ?{
+        startTime = _startTime;
+        endTime = _endTime;
+        minPerUser = _minPerUser;
+        maxPerUser = _maxPerUser;
+        amount = _amount;
+        var amountLeft = _amount;
+        var fundRaised = 0;
+        devFee = _devFee;
+        devAddr = _devAddr;
+        price = _price;
+        paymentToken = _paymentToken;
+        whitelist = _whitelist;
+        var fundClaimed = false;
+        var feeClaimed = false;
+    };
 
     private stable var logo_ : Text = _logo; // base64 encoded image
     private stable var name_ : Text = _name;
