@@ -381,6 +381,7 @@ shared(msg) actor class NFTSale(
     };
 
     public shared(msg) func setSaleInfo(info: ?SaleInfoExt): async ?SaleInfoExt {
+        assert(msg.caller == owner_);
         switch(info) {
             case(?i) {
                 saleInfo := ?{
