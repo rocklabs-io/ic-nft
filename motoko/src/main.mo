@@ -10,19 +10,17 @@ import HashMap "mo:base/HashMap";
 import Cycles "mo:base/ExperimentalCycles";
 import Principal "mo:base/Principal";
 import Error "mo:base/Error";
-import Option "mo:base/Option";
 import Nat "mo:base/Nat";
 import Int "mo:base/Int";
 import Hash "mo:base/Hash";
 import Text "mo:base/Text";
-import List "mo:base/List";
 import Time "mo:base/Time";
 import Iter "mo:base/Iter";
 import TrieSet "mo:base/TrieSet";
 import Array "mo:base/Array";
 import Result "mo:base/Result";
 import Prelude "mo:base/Prelude";
-import Debug "mo:base/Debug";
+import Buffer "mo:base/Buffer";
 import Types "./types";
 
 shared(msg) actor class NFToken(
@@ -540,11 +538,12 @@ shared(msg) actor class NFToken(
                 []
             };
         };
-        var ret: [TokenInfoExt] = [];
+        let ret = Buffer.Buffer<TokenInfoExt>(tokenIds.size());
+    
         for(id in Iter.fromArray(tokenIds)) {
-            ret := Array.append(ret, [_tokenInfotoExt(_unwrap(tokens.get(id)))]);
+            ret.add(_tokenInfotoExt(_unwrap(tokens.get(id))));
         };
-        return ret;
+        return ret.toArray();
     };
 
     public query func ownerOf(tokenId: Nat): async Principal {
@@ -584,13 +583,13 @@ shared(msg) actor class NFToken(
     };
 
     public query func getTransactions(start: Nat, limit: Nat): async [TxRecord] {
-        var res: [TxRecord] = [];
+        let res = Buffer.Buffer<TxRecord>(limit);
         var i = start;
         while (i < start + limit and i < txs.size()) {
-            res := Array.append(res, [txs[i]]);
+            res.add(txs[i]);
             i += 1;
         };
-        return res;
+        return res.toArray();
     };
 
     public query func getUserTransactionAmount(user: Principal): async Nat {
@@ -604,7 +603,7 @@ shared(msg) actor class NFToken(
     };
 
     public query func getUserTransactions(user: Principal, start: Nat, limit: Nat): async [TxRecord] {
-        var res: [TxRecord] = [];
+        let res = Buffer.Buffer<TxRecord>(limit);
         var idx = 0;
         label l for (i in txs.vals()) {
             if (i.caller == user or i.from == #user(user) or i.to == #user(user)) {
@@ -615,11 +614,11 @@ shared(msg) actor class NFToken(
                 if(idx >= start + limit) {
                     break l;
                 };
-                res := Array.append<TxRecord>(res, [i]);
+                res.add(i);
                 idx += 1;
             };
         };
-        return res;
+        return res.toArray();
     };
 
     // upgrade functions
