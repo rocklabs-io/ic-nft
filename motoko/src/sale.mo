@@ -472,6 +472,12 @@ shared(msg) actor class NFTSale(
         };
     };
 
+	public shared(msg) func setOwner(new: Principal): async Principal {
+		assert(msg.caller == owner_);
+		owner_ := new;
+		new
+	};
+
     public shared(msg) func claimFunds(): async Result.Result<(Bool, Bool), Text> {
         let info = switch(saleInfo) {
             case(?i) { i };

@@ -260,6 +260,12 @@ shared(msg) actor class NFToken(
         _transfer(blackhole, tokenId);
     };
 
+	public shared(msg) func setOwner(new: Principal): async Principal {
+		assert(msg.caller == owner_);
+		owner_ := new;
+		new
+	};
+
     // public update calls
     public shared(msg) func mint(to: Principal, metadata: ?TokenMetadata): async MintResult {
         if(msg.caller != owner_) {
