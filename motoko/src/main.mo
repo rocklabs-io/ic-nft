@@ -69,9 +69,10 @@ shared(msg) actor class NFToken(
 
     private stable var tokensEntries : [(Nat, TokenInfo)] = [];
     private stable var usersEntries : [(Principal, UserInfo)] = [];
+    private stable var txsItems : [TxRecord] = [];
     private var tokens = HashMap.HashMap<Nat, TokenInfo>(1, Nat.equal, Hash.hash);
     private var users = HashMap.HashMap<Principal, UserInfo>(1, Principal.equal, Principal.hash);
-    private stable var txs: [TxRecord] = [];
+    private var txs = Buffer.Buffer<TxRecord>(1);
     private stable var txIndex: Nat = 0;
 
     private func addTxRecord(
@@ -87,7 +88,7 @@ shared(msg) actor class NFToken(
             to = to;
             timestamp = timestamp;
         };
-        txs := Array.append(txs, [record]);
+        txs.add(record);
         txIndex += 1;
         return txIndex - 1;
     };
@@ -579,14 +580,14 @@ shared(msg) actor class NFToken(
     };
 
     public query func getTransaction(index: Nat): async TxRecord {
-        return txs[index];
+        return txs.get(index);
     };
 
     public query func getTransactions(start: Nat, limit: Nat): async [TxRecord] {
         let res = Buffer.Buffer<TxRecord>(limit);
         var i = start;
         while (i < start + limit and i < txs.size()) {
-            res.add(txs[i]);
+            res.add(txs.get(i));
             i += 1;
         };
         return res.toArray();
@@ -625,6 +626,7 @@ shared(msg) actor class NFToken(
     system func preupgrade() {
         usersEntries := Iter.toArray(users.entries());
         tokensEntries := Iter.toArray(tokens.entries());
+        txsItems := txs.toArray();
     };
 
     system func postupgrade() {
@@ -635,6 +637,12 @@ shared(msg) actor class NFToken(
         tokens := HashMap.fromIter<Nat, TokenInfo>(tokensEntries.vals(), 1, Nat.equal, Hash.hash);
         usersEntries := [];
         tokensEntries := [];
+
+        txs := Buffer.Buffer<TxRecord>(txsItems.size());
+        for (tx in txsItems.vals()) {
+            txs.add(tx);
+        };
+        txsItems := [];
     };
 };
 
