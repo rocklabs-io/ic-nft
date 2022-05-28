@@ -6,21 +6,22 @@
  * Stability  : Experimental
  */
 
-import HashMap "mo:base/HashMap";
+import Array "mo:base/Array";
+import Buffer "mo:base/Buffer";
 import Cycles "mo:base/ExperimentalCycles";
-import Principal "mo:base/Principal";
 import Error "mo:base/Error";
-import Nat "mo:base/Nat";
-import Int "mo:base/Int";
 import Hash "mo:base/Hash";
+import HashMap "mo:base/HashMap";
+import Int "mo:base/Int";
+import Iter "mo:base/Iter";
+import Nat "mo:base/Nat";
+import Prelude "mo:base/Prelude";
+import Principal "mo:base/Principal";
+import Result "mo:base/Result";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
-import Iter "mo:base/Iter";
 import TrieSet "mo:base/TrieSet";
-import Array "mo:base/Array";
-import Result "mo:base/Result";
-import Prelude "mo:base/Prelude";
-import Buffer "mo:base/Buffer";
+
 import Types "./types";
 
 shared(msg) actor class NFToken(
@@ -58,6 +59,8 @@ shared(msg) actor class NFToken(
         #Ok: (Nat, Nat);
         #Err: Errors;
     };
+
+    public type Result<Ok, Err> = {#ok : Ok; #err : Err};
 
     private stable var logo_ : Text = _logo; // base64 encoded image
     private stable var name_ : Text = _name;
@@ -500,31 +503,31 @@ shared(msg) actor class NFToken(
         return _isApprovedForAll(owner, operator);
     };
 
-    public query func getOperator(tokenId: Nat) : async Principal {
+    public query func getOperator(tokenId: Nat) : async Result<Principal, Errors> {
         switch (_exists(tokenId)) {
             case true {
                 switch (_getApproved(tokenId)) {
                     case (?who) {
-                        return who;
+                        return #ok(who);
                     };
                     case (_) {
-                        return Principal.fromText("aaaaa-aa");
+                        return #ok(Principal.fromText("aaaaa-aa"));
                     };
                 }   
             };
             case (_) {
-                throw Error.reject("token not exist")
+                return #err(#TokenNotExist);
             };
         }
     };
 
-    public query func getUserInfo(who: Principal) : async UserInfoExt {
+    public query func getUserInfo(who: Principal) : async Result<UserInfoExt, Errors> {
         switch (users.get(who)) {
             case (?user) {
-                return _userInfotoExt(user)
+                return #ok(_userInfotoExt(user));
             };
             case _ {
-                throw Error.reject("unauthorized");
+                return #err(#Unauthorized);
             };
         };        
     };
@@ -546,24 +549,24 @@ shared(msg) actor class NFToken(
         return ret.toArray();
     };
 
-    public query func ownerOf(tokenId: Nat): async Principal {
+    public query func ownerOf(tokenId: Nat): async Result<Principal, Errors> {
         switch (_ownerOf(tokenId)) {
             case (?owner) {
-                return owner;
+                return #ok(owner);
             };
             case _ {
-                throw Error.reject("token not exist")
+                return #err(#TokenNotExist);
             };
         }
     };
 
-    public query func getTokenInfo(tokenId: Nat) : async TokenInfoExt {
+    public query func getTokenInfo(tokenId: Nat) : async Result<TokenInfoExt, Errors> {
         switch(tokens.get(tokenId)){
             case(?tokeninfo) {
-                return _tokenInfotoExt(tokeninfo);
+                return #ok(_tokenInfotoExt(tokeninfo));
             };
             case(_) {
-                throw Error.reject("token not exist");
+                return #err(#TokenNotExist);
             };
         };
     };
