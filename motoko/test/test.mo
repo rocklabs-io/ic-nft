@@ -1,11 +1,13 @@
-import Principal "mo:base/Principal";
+import Debug "mo:base/Debug";
+import Int "mo:base/Int";
 import Iter "mo:base/Iter";
 import Nat "mo:base/Nat";
-import Int "mo:base/Int";
-import Text "mo:base/Text";
-import Debug "mo:base/Debug";
-import Time "mo:base/Time";
+import Prelude "mo:base/Prelude";
+import Principal "mo:base/Principal";
 import Result "mo:base/Result";
+import Text "mo:base/Text";
+import Time "mo:base/Time";
+
 import Types "../src//types";
 
 actor class Testflow(token_ERC721_id : Principal, alice: Principal, bob: Principal) = this {
@@ -29,6 +31,7 @@ actor class Testflow(token_ERC721_id : Principal, alice: Principal, bob: Princip
     };
     public type TxReceipt = Result.Result<Nat, Error>;
     public type MintResult = Result.Result<(Nat, Nat), Error>; // token index, txid
+    public type Result<Ok, Err> = {#ok : Ok; #err : Err};
 
     public type NftActor = actor {
         mint: shared (to: Principal, metadata: TokenMetadata) -> async MintResult;
@@ -49,11 +52,11 @@ actor class Testflow(token_ERC721_id : Principal, alice: Principal, bob: Princip
         totalSupply:  query ()  -> async Nat;
         getMetadata:  query ()  -> async Metadata;
         isApprovedForAll: query (owner: Principal, operator: Principal) -> async Bool;
-        getOperator:  query (tokenId: Nat)   -> async Principal;
-        getUserInfo:  query (who: Principal) -> async UserInfoExt;
+        getOperator:  query (tokenId: Nat)   -> async Result<Principal, Error>;
+        getUserInfo:  query (who: Principal) -> async Result<UserInfoExt, Error>;
         getUserTokens:query (owner: Principal) -> async [TokenInfoExt];
-        ownerOf:      query (tokenId: Nat)   -> async Principal;
-        getTokenInfo: query (tokenId: Nat)   -> async TokenInfoExt;
+        ownerOf:      query (tokenId: Nat)   -> async Result<Principal, Error>;
+        getTokenInfo: query (tokenId: Nat)   -> async Result<TokenInfoExt, Error>;
         getAllTokens: query ()  -> async [TokenInfoExt];
         getTransaction: query (index: Nat)   -> async TxRecord;
         getTransactions: query (start: Nat, limit: Nat)  -> async [TxRecord];
@@ -245,7 +248,14 @@ actor class Testflow(token_ERC721_id : Principal, alice: Principal, bob: Princip
     };
 
     public func logTokenInfos(tokenId:Nat) : async Bool{
-        let tokenInfo: TokenInfoExt = await nftCanister.getTokenInfo(tokenId);
+        let tokenInfo: TokenInfoExt = switch(await nftCanister.getTokenInfo(tokenId)) {
+            case (#ok(tokenInfo)) {
+                tokenInfo;
+            };
+            case (#err(code)) {
+                Prelude.unreachable();
+            };
+        };
         log_info("\n");
         log_info("Token " # Nat.toText(tokenId) # " Info:");
         log_info("* index: "# Nat.toText(tokenInfo.index));
@@ -256,19 +266,32 @@ actor class Testflow(token_ERC721_id : Principal, alice: Principal, bob: Princip
         };
         log_info("* Timestamp: " # Int.toText(tokenInfo.timestamp));
         log_info("* TokenMetadata:");
-        log_info("     filetype: " # tokenInfo.metadata.filetype);
-        switch(tokenInfo.metadata.location){
-            case (#InCanister(b)) log_info("     location: " # "blob" # "");
-            case (#AssetCanister((p,b))) log_info("     location: " # "Principal: "# Principal.toText(p) # " blob:" # "");
-            case (#IPFS(t)) log_info("     location: " # t);
-            case (#Web(t))  log_info("     location: " # t);
+        switch(tokenInfo.metadata) {
+            case (null) log_info("* no metadata");
+            case (?metadata) {
+                log_info("     filetype: " # metadata.filetype);
+                switch(metadata.location){
+                    case (#InCanister(b)) log_info("     location: " # "blob" # "");
+                    case (#AssetCanister((p,b))) log_info("     location: " # "Principal: "# Principal.toText(p) # " blob:" # "");
+                    case (#IPFS(t)) log_info("     location: " # t);
+                    case (#Web(t))  log_info("     location: " # t);
+                };
+                log_info("     attributes: {key: " # metadata.attributes[0].key # " , value: " # metadata.attributes[0].value # "}");
+            };
         };
-        log_info("     attributes: {key: " # tokenInfo.metadata.attributes[0].key # " , value: " # tokenInfo.metadata.attributes[0].value # "}");
+
         true
     };
 
     public func logUserInfos(who: Principal): async Bool {
-        let userInfo: UserInfoExt = await nftCanister.getUserInfo(who);
+        let userInfo: UserInfoExt = switch(await nftCanister.getUserInfo(who)) {
+            case (#ok(userInfo)) {
+                userInfo;
+            };
+            case (#err(code)) {
+                Prelude.unreachable();
+            };
+        };
         //Todo
         log_info("User Info:" # Principal.toText(who));
         var operators: Text = "";
